@@ -10,17 +10,16 @@ let uploadedImagesBase64 = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     applyAdminUI();
-    loadProducts(); // Умная загрузка локальной памяти + облака
+    loadProducts(); 
     updateCartUI();
     
-    // Проверяем обновления из облака каждые 20 секунд
+    // Проверяем обновления раз в 20 секунд
     setInterval(loadProductsFromCloud, 20000); 
 });
 
 function applyAdminUI() {
     const indicator = document.getElementById('admin-indicator');
     const floatBtn = document.getElementById('panel-add-btn');
-    
     if (isAdminMode) {
         if (indicator) indicator.style.display = 'flex';
         if (floatBtn) floatBtn.style.display = 'flex';
@@ -30,7 +29,6 @@ function applyAdminUI() {
     }
 }
 
-// Умная загрузка: сначала берем локальные железные данные, потом ищем в облаке
 function loadProducts() {
     const localData = localStorage.getItem('monetka_products_backup');
     if (localData) {
@@ -49,10 +47,8 @@ async function loadProductsFromCloud() {
         const data = await response.json();
         const cloudProducts = data.record || [];
         
-        // Если в облаке товаров больше или они другие — объединяем с локальными, убирая дубликаты
         if (cloudProducts.length > 0) {
             let combined = [...products, ...cloudProducts];
-            // Фильтруем дубли по ID
             let uniqueMap = {};
             combined.forEach(p => { uniqueMap[p.id] = p; });
             products = Object.values(uniqueMap).sort((a,b) => b.id - a.id);
@@ -62,12 +58,11 @@ async function loadProductsFromCloud() {
             renderProducts();
         }
     } catch (err) {
-        console.log("Облако недоступно, работаем на локальной памяти телефона.");
+        console.log("Облако недоступно, работаем на внутренней памяти.");
     }
 }
 
 async function saveProductsToCloud(updatedList) {
-    // В ЛЮБОМ СЛУЧАЕ намертво сохраняем товар в память телефона
     localStorage.setItem('monetka_products_backup', JSON.stringify(updatedList));
     products = updatedList;
     renderCategories();
@@ -83,17 +78,17 @@ async function saveProductsToCloud(updatedList) {
             body: JSON.stringify(updatedList)
         });
     } catch (err) {
-        console.log("Не удалось закинуть в облако, но в памяти телефона товар сохранен!");
+        console.log("Товар зафиксирован в локальной памяти.");
     }
 }
 
 function handleLogoClick() {
     switchTab('shop');
     if (!isAdminMode) {
-        let pass = prompt("Введите пароль администратора:");
+        let pass = prompt("Введите пароль:");
         if (pass === "13579") {
             localStorage.setItem('monetka_admin', 'true');
-            alert("Вход выполнен! Страница будет перезагружена.");
+            alert("Вход выполнен!");
             location.reload(); 
         } else if (pass !== null) {
             alert("Неверный пароль!");
@@ -102,27 +97,24 @@ function handleLogoClick() {
 }
 
 function logoutAdmin() {
-    if (confirm("Выйти из режима администратора?")) {
+    if (confirm("Выйти?")) {
         localStorage.removeItem('monetka_admin');
-        alert("Вы вышли. Страница перезагружается.");
         location.reload();
     }
 }
 
 function handleMultipleFiles(event) {
     const files = Array.from(event.target.files);
-    
     if (uploadedImagesBase64.length + files.length > 3) {
-        alert("Можно загрузить не более 3-х фотографий на один товар!");
+        alert("Можно загрузить максимум 3 фото!");
         return;
     }
 
     files.forEach(file => {
         if (file.size > 2 * 1024 * 1024) {
-            alert(`Файл ${file.name} слишком большой (более 2МБ)!`);
+            alert(`Файл ${file.name} больше 2МБ!`);
             return;
         }
-
         const reader = new FileReader();
         reader.onload = function(e) {
             uploadedImagesBase64.push(e.target.result);
@@ -136,7 +128,6 @@ function handleMultipleFiles(event) {
 function renderThumbnails() {
     const container = document.getElementById('thumb-container');
     if (!container) return;
-    
     container.innerHTML = uploadedImagesBase64.map((img, idx) => `
         <div class="thumb-wrapper">
             <img src="${img}">
@@ -163,7 +154,7 @@ function addNewProductFromSite() {
     const desc = document.getElementById('admin-desc').value.trim();
 
     if (!title || !price) {
-        alert("Заполните Название и Цену!");
+        alert("Заполните поля!");
         return;
     }
 
@@ -183,7 +174,6 @@ function addNewProductFromSite() {
     document.getElementById('admin-price').value = '';
     document.getElementById('admin-desc').value = '';
     uploadedImagesBase64 = [];
-    document.getElementById('thumb-container').innerHTML = '';
     
     closeModal('admin-modal');
     alert("✅ Товар успешно добавлен!");
@@ -191,12 +181,13 @@ function addNewProductFromSite() {
 
 function deleteProduct(id, event) {
     event.stopPropagation(); 
-    if (confirm("Удалить этот товар из базы?")) {
+    if (confirm("Удалить этот товар?")) {
         const updatedList = products.filter(p => p.id !== id);
         saveProductsToCloud(updatedList);
     }
 }
 
+// Генерация HTML-слайдера (вызывается теперь ТОЛЬКО в подробном просмотре)
 function generateSliderHtml(productId, imagesArray) {
     const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
     let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
@@ -236,6 +227,7 @@ function moveSlider(productId, direction, event) {
     track.style.transform = `translateX(-${current * 100}%)`;
 }
 
+// Отрисовка товаров на витрине (Только 1 главное фото!)
 function renderProducts() {
     const container = document.getElementById('products-container');
     if (!container) return;
@@ -254,13 +246,13 @@ function renderProducts() {
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
         const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
+        
+        // Берем только самое первое фото для обложки на витрине
         const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
-        const sliderHtml = generateSliderHtml(prod.id, imagesList);
+        const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x150/1f293d/ffffff?text=📦';
 
         card.innerHTML = `
-            <div class="product-img-wrapper">
-                ${sliderHtml}
-            </div>
+            <img src="${coverPhoto}" class="product-main-photo" loading="lazy">
             <div class="product-info">
                 <div class="product-price">${Number(prod.price)} BYN</div>
                 <div class="product-title">${prod.title}</div>
@@ -274,21 +266,24 @@ function renderProducts() {
     });
 }
 
+// ПОДРОБНЫЙ ПРОСМОТР ТОВАРА (Вот здесь разворачивается слайдер всех фоток)
 function openDetailModal(id, event) {
-    if (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn') || event.target.closest('.slider-arrow')) return;
+    if (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn')) return;
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
     const content = document.getElementById('modal-detail-content');
     const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
-    const modalSliderHtml = generateSliderHtml(-prod.id, imagesList);
+    
+    // Передаем уникальный ID для слайдера в модалке
+    const modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
 
     content.innerHTML = `
         <div style="position:relative;">
             ${modalSliderHtml}
         </div>
         <div style="padding: 1.2rem;">
-            <h2 style="font-size: 1.4rem; margin-bottom:0.2rem;">${prod.title}</h2>
+            <h2 style="font-size: 1.4rem; margin-bottom:0.2rem; color:#fff;">${prod.title}</h2>
             <p style="color: #1abc9c; font-size:0.85rem; margin-bottom: 1rem;">Категория: ${prod.category}</p>
             <div class="modal-price" style="font-size:1.6rem; color:var(--primary); font-weight:800; margin-bottom:1.2rem;">${Number(prod.price).toLocaleString()} BYN</div>
             <h3 style="margin-bottom: 0.4rem; font-size: 1rem; color:#fff;">Описание:</h3>
@@ -323,10 +318,8 @@ function renderCategories() {
             baseCategories.push(p.category);
         }
     });
-    
     const container = document.getElementById('categories-list');
     if (!container) return;
-    
     container.innerHTML = baseCategories.map(cat => {
         const name = cat === 'all' ? 'Все' : cat;
         return `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${name}</div>`;
@@ -349,7 +342,6 @@ function addToCart(id, event) {
     updateCartUI();
 }
 
-// ... остальной код (removeFromCart, updateCartUI, openCartModal, renderCartItems, closeModal) остается без изменений
 function removeFromCart(index) {
     cart.splice(index, 1);
     localStorage.setItem('monetka_cart', JSON.stringify(cart));
@@ -385,7 +377,7 @@ function renderCartItems() {
         const itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
         return `
             <div class="cart-item">
-                <img src="${itemPhoto}" alt="" style="width:50px; height:50px; object-fit:cover; border-radius:6px;">
+                <img src="${itemPhoto}" style="width:50px; height:50px; object-fit:cover; border-radius:6px;">
                 <div class="cart-item-info">
                     <h4>${item.title}</h4>
                     <span style="color: var(--primary); font-weight: bold;">${Number(item.price).toLocaleString()} BYN</span>
