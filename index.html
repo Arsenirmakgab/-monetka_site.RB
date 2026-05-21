@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* Стили мобильного фреймворка и админки */
         :root {
             --bg-main: #131a26;
             --bg-card: #1f293d;
@@ -26,7 +25,7 @@
             justify-content: center;
         }
 
-        /* Ограничение под мобильный телефон */
+        /* Мобильный контейнер */
         .mobile-container {
             width: 100%;
             max-width: 480px;
@@ -76,21 +75,40 @@
             gap: 0.3rem;
         }
 
-        /* Панель категорий - теперь закреплена выше, прямо под шапкой */
         .sticky-categories {
             position: sticky;
             top: 62px;
             z-index: 90;
             background: var(--bg-main);
-            padding: 0.8rem 1rem;
+            padding: 0.8rem 0.5rem;
             border-bottom: 1px solid rgba(255,255,255,0.02);
         }
 
-        /* Слайдер картинок в карточке */
+        /* Мощная адаптивная сетка: СТРОГО 4 КАРТОЧКИ В РЯД */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr) !important; 
+            gap: 6px !important; 
+            padding: 0 !important;
+        }
+
+        /* Компактная карточка под формат "4 в ряд" */
+        .product-card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        /* Уменьшаем высоту слайдера для маленьких карточек */
         .product-slider {
             position: relative;
             width: 100%;
-            height: 220px;
+            height: 90px; 
             overflow: hidden;
             background: #151d2a;
         }
@@ -103,9 +121,6 @@
         .slider-slide {
             min-width: 100%;
             height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         .slider-slide img {
             width: 100%;
@@ -116,39 +131,66 @@
             position: absolute;
             top: 50%;
             transform: translateY(-50%);
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.6);
             color: white;
             border: none;
-            padding: 0.5rem 0.7rem;
-            border-radius: 50%;
-            cursor: pointer;
-            z-index: 5;
-            font-size: 0.8rem;
-        }
-        .slider-arrow.prev { left: 8px; }
-        .slider-arrow.next { right: 8px; }
-        .slider-dots {
-            position: absolute;
-            bottom: 8px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 4px;
-            z-index: 5;
-        }
-        .slider-dot {
-            width: 6px;
-            height: 6px;
-            background: rgba(255,255,255,0.4);
-            border-radius: 50%;
-        }
-        .slider-dot.active {
-            background: var(--primary);
-            width: 12px;
+            padding: 2px 4px;
             border-radius: 4px;
+            font-size: 0.6rem;
+            z-index: 5;
+        }
+        .slider-arrow.prev { left: 2px; }
+        .slider-arrow.next { right: 2px; }
+
+        /* Компактный текст внутри карточки */
+        .product-info {
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .product-price {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+        .product-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #fff;
+        }
+        .product-desc {
+            display: none; /* Прячем описание на витрине, чтобы влезло 4 в ряд. Оно будет видно при клике! */
+        }
+        
+        /* Кнопка "В корзину" и "Удалить" маленькие под размер */
+        .card-btn {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            text-align: center;
+        }
+        .delete-card-btn {
+            background: var(--danger);
+            color: white;
+            padding: 4px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.6rem;
+            width: 100%;
+            margin-top: 3px;
         }
 
-        /* Плавающая кнопка добавления товара для Админа */
+        /* Плавающая кнопка добавления */
         .float-add-btn {
             position: fixed;
             bottom: 85px;
@@ -206,7 +248,6 @@
         .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
         .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
         .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
-        .delete-card-btn { background: var(--danger); color: white; padding: 0.5rem; border: none; border-radius: 6px; font-weight: bold; font-size: 0.85rem; width: 100%; margin-top: 0.5rem; }
 
         /* Нижний навигатор */
         .mobile-nav {
@@ -255,7 +296,7 @@
             <div class="categories-bar" id="categories-list"></div>
         </div>
 
-        <main style="padding: 0 1rem 1rem 1rem;">
+        <main style="padding: 0 8px 8px 8px;">
             <section id="shop-section" class="section active">
                 <div class="products-grid" id="products-container"></div>
             </section>
@@ -306,7 +347,7 @@
             
             <div class="admin-form-group">
                 <label>Название товара:</label>
-                <input type="text" id="admin-title" class="admin-input" placeholder="Например: Худи Оверсайз">
+                <input type="text" id="admin-title" class="admin-input" placeholder="Например: Худи">
             </div>
             <div class="admin-form-group">
                 <label>Цена (в BYN):</label>
@@ -337,7 +378,7 @@
                 <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
             </div>
             
-            <button class="card-btn" style="margin-top: 0.5rem;" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
+            <button class="card-btn" style="margin-top: 0.5rem; padding: 12px; font-size: 0.9rem;" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
         </div>
     </div>
 
@@ -357,7 +398,7 @@
                 <h4>Итого:</h4>
                 <h3 id="cart-total-price" style="color: var(--primary);">0.00 BYN</h3>
             </div>
-            <button class="card-btn" style="margin-top: 1rem;" onclick="alert('Заказ успешно оформлен!')">Оформить заказ</button>
+            <button class="card-btn" style="margin-top: 1rem; padding: 12px;" onclick="alert('Заказ успешно оформлен!')">Оформить заказ</button>
         </div>
     </div>
 
