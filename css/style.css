@@ -1,0 +1,505 @@
+/* -------------------------------------------------------------------------- */
+/* 🎨 КЛЮЧЕВЫЕ ПЕРЕМЕННЫЕ И НАСТРОЙКИ                                         */
+/* -------------------------------------------------------------------------- */
+:root {
+    --primary: #FFD700;          /* Золотой/Желтый цвет бренда */
+    --primary-hover: #E6C200;    /* Цвет кнопок при наведении */
+    --bg-dark: #0F172A;          /* Глубокий темный фон сайта */
+    --bg-card: #1E293B;          /* Фон для карточек и панелей */
+    --text-main: #F8FAFC;        /* Главный белый текст */
+    --text-muted: #94A3B8;       /* Серый текст для описаний */
+    --accent: #38BDF8;           /* Голубой акцент для ссылок/категорий */
+    --shadow-neon: 0 0 15px rgba(255, 215, 0, 0.2);
+}
+
+/* Общий сброс стилей */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent; /* Убираем синий клик на мобилках */
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow-x: hidden;
+    line-height: 1.5;
+}
+
+/* -------------------------------------------------------------------------- */
+/* ✨ ЭФФЕКТЫ АНИМАЦИЙ                                                        */
+/* -------------------------------------------------------------------------- */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 📑 ШАПКА САЙТА (HEADER)                                                   */
+/* -------------------------------------------------------------------------- */
+header {
+    background: rgba(30, 41, 59, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: fixed;
+    width: 100%;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.2rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--primary);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    text-shadow: var(--shadow-neon);
+}
+
+nav {
+    display: flex;
+    gap: 2rem;
+}
+
+nav a {
+    color: var(--text-main);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+nav a:hover, nav a.active {
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+/* Иконка корзины */
+.cart-icon-btn {
+    position: relative;
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0.5rem;
+}
+
+.cart-icon-btn:hover {
+    transform: scale(1.1);
+    color: var(--primary);
+}
+
+.cart-count {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    background: #EF4444;
+    color: white;
+    font-size: 0.75rem;
+    min-width: 18px;
+    height: 18px;
+    padding: 2px;
+    border-radius: 50%;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 🧱 ОСНОВНОЙ КОНТЕНТ И СЕКЦИИ                                               */
+/* -------------------------------------------------------------------------- */
+main {
+    max-width: 1200px;
+    margin: 7.5rem auto 4rem;
+    padding: 0 2rem;
+    min-height: 75vh;
+}
+
+.section {
+    display: none;
+    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.section.active {
+    display: block;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 🏷️ СТРОКА КАТЕГОРИЙ                                                        */
+/* -------------------------------------------------------------------------- */
+.categories-bar {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 2.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.8rem;
+}
+
+/* Прячем некрасивый скроллбар на телефонах */
+.categories-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.category-chip {
+    background: var(--bg-card);
+    padding: 0.6rem 1.4rem;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: nowrap;
+}
+
+.category-chip:hover, .category-chip.active {
+    background: var(--primary);
+    color: #0F172A;
+    font-weight: 700;
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+    border-color: transparent;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 📦 СЕТКА И КАРТОЧКИ ТОВАРОВ                                                */
+/* -------------------------------------------------------------------------- */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 2rem;
+}
+
+.product-card {
+    background: var(--bg-card);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    display: flex;
+    flex-direction: column;
+    opacity: 0; /* Изначально скрыты для анимации плавного появления */
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+.product-card:hover {
+    transform: translateY(-10px);
+    border-color: rgba(255, 215, 0, 0.2);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), 0 0 25px rgba(255, 215, 0, 0.05);
+}
+
+.product-img-wrapper {
+    width: 100%;
+    height: 220px;
+    position: relative;
+    background: #273549;
+    overflow: hidden;
+}
+
+.product-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.product-card:hover .product-img {
+    transform: scale(1.06);
+}
+
+.product-info {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.product-price {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+    margin-bottom: 0.4rem;
+}
+
+.product-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-desc {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+/* Кнопка "В корзину" */
+.card-btn {
+    width: 100%;
+    background: var(--primary);
+    color: #0F172A;
+    border: none;
+    padding: 0.9rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.card-btn:hover {
+    background: var(--primary-hover);
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 💳 СТРАНИЦЫ АДРЕСА И КОНТАКТОВ                                             */
+/* -------------------------------------------------------------------------- */
+.info-card {
+    background: var(--bg-card);
+    padding: 3rem 2rem;
+    border-radius: 24px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 550px;
+    margin: 2rem auto;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-card i {
+    font-size: 3.5rem;
+    color: var(--primary);
+    margin-bottom: 1.5rem;
+    filter: drop-shadow(var(--shadow-neon));
+}
+
+.info-card h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+}
+
+.info-card p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 🪟 МОДАЛЬНЫЕ ОКНА (MODALS)                                                 */
+/* -------------------------------------------------------------------------- */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    padding: 1rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background: var(--bg-card);
+    width: 100%;
+    max-width: 580px;
+    border-radius: 24px;
+    padding: 2.2rem;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    animation: scaleIn 0.33s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.close-modal {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: var(--text-main);
+    font-size: 1.3rem;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.close-modal:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--primary);
+}
+
+/* Наполнение карточки детального просмотра */
+.modal-body-detail img {
+    width: 100%;
+    height: 280px;
+    object-fit: cover;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+}
+
+.modal-price {
+    font-size: 2rem;
+    color: var(--primary);
+    font-weight: 800;
+    margin: 0.8rem 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 🛒 ЭЛЕМЕНТЫ КОРЗИНЫ                                                        */
+/* -------------------------------------------------------------------------- */
+.cart-item {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem;
+    border-radius: 14px;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.cart-item img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.cart-item-info {
+    flex: 1;
+}
+
+.cart-item-info h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+}
+
+.remove-item-btn {
+    background: none;
+    border: none;
+    color: #EF4444;
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: transform 0.2s;
+}
+
+.remove-item-btn:hover {
+    transform: scale(1.15);
+}
+
+/* -------------------------------------------------------------------------- */
+/* 📱 АДАПТИВНОСТЬ ПОД ТЕЛЕФОНЫ (RESPONSIVE)                                 */
+/* -------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+    .header-container {
+        padding: 1rem 1.2rem;
+    }
+    
+    nav {
+        gap: 1rem;
+    }
+    
+    nav a span, nav a i {
+        font-size: 1.1rem;
+    }
+    
+    /* Скрываем подписи меню на мобилках, оставляем только иконки для компактности */
+    nav a {
+        font-size: 0; 
+    }
+    
+    main {
+        margin: 6.5rem auto 3rem;
+        padding: 0 1.2rem;
+    }
+    
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 1.2rem;
+    }
+    
+    .modal-content {
+        padding: 1.5rem;
+    }
+    
+    .modal-body-detail img {
+        height: 200px;
+    }
+}

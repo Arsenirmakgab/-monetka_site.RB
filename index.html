@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Монетка Маркет</title>
+    <!-- Подключаем иконки -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Стили мобильного фреймворка и админки */
+        :root {
+            --bg-main: #131a26;
+            --bg-card: #1f293d;
+            --primary: #ffd700;
+            --text-main: #ffffff;
+            --text-muted: #8fa0ba;
+            --danger: #ef4444;
+        }
+
+        body {
+            background-color: #0b0f17;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Ограничение под мобильный телефон */
+        .mobile-container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--bg-main);
+            min-height: 100vh;
+            color: var(--text-main);
+            position: relative;
+            padding-bottom: 80px; /* Отступ под нижний навигатор */
+            box-sizing: border-box;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .logo {
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--text-main);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            user-select: none;
+        }
+
+        /* Кнопка админа в шапке (если залогинен) */
+        .admin-badge {
+            background: rgba(26, 188, 156, 0.2);
+            border: 1px solid #1abc9c;
+            color: #1abc9c;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        /* Слайдер картинок в карточке */
+        .product-slider {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            overflow: hidden;
+            background: #151d2a;
+        }
+        .slider-track {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.3s ease-in-out;
+        }
+        .slider-slide {
+            min-width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .slider-slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .slider-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            padding: 0.5rem 0.7rem;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 5;
+            font-size: 0.8rem;
+        }
+        .slider-arrow.prev { left: 8px; }
+        .slider-arrow.next { right: 8px; }
+        .slider-dots {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            z-index: 5;
+        }
+        .slider-dot {
+            width: 6px;
+            height: 6px;
+            background: rgba(255,255,255,0.4);
+            border-radius: 50%;
+        }
+        .slider-dot.active {
+            background: var(--primary);
+            width: 12px;
+            border-radius: 4px;
+        }
+
+        /* Плавающая кнопка добавления для Админа */
+        .float-add-btn {
+            position: fixed;
+            bottom: 85px;
+            right: calc(50% - 220px);
+            background: #1abc9c;
+            color: white;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: none; /* Включается через JS */
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            border: none;
+            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4);
+            z-index: 99;
+            cursor: pointer;
+        }
+        @media (max-width: 480px) {
+            .float-add-btn { right: 20px; }
+        }
+
+        /* Стили превью файлов в форме */
+        .preview-thumbnails {
+            display: flex;
+            gap: 8px;
+            margin-top: 0.8rem;
+            overflow-x: auto;
+        }
+        .thumb-wrapper {
+            position: relative;
+            width: 70px;
+            height: 70px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .thumb-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+        .thumb-remove {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(239,68,68,0.8);
+            color: white;
+            border: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            font-size: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Контейнеры форм */
+        .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
+        .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
+        .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
+        .delete-card-btn { background: var(--danger); color: white; padding: 0.5rem; border: none; border-radius: 6px; font-weight: bold; font-size: 0.85rem; width: 100%; margin-top: 0.5rem; }
+
+        /* Нижний мобильный навигатор */
+        .mobile-nav {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            max-width: 480px;
+            background: var(--bg-card);
+            display: flex;
+            justify-content: space-around;
+            padding: 0.6rem 0;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            z-index: 100;
+        }
+        .mobile-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-decoration: none;
+            cursor: pointer;
+            gap: 4px;
+        }
+        .mobile-nav-item.active { color: var(--primary); }
+        .mobile-nav-item i { font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-container">
+        
+        <!-- ШАПКА -->
+        <header>
+            <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
+            <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
+                <div class="admin-badge"><i class="fa-solid fa-user-shield"></i> Admin</div>
+                <i class="fa-solid fa-right-from-bracket" onclick="logoutAdmin()" style="color: var(--danger); cursor: pointer;"></i>
+            </div>
+            <button class="cart-icon-btn" onclick="openCartModal()">
+                <i class="fa-solid fa-basket-shopping"></i>
+                <span class="cart-count" id="cart-count">0</span>
+            </button>
+        </header>
+
+        <!-- ОСНОВНОЙ КОНТЕНТ -->
+        <main style="padding: 1rem;">
+            <!-- СЕКЦИЯ МАГАЗИНА -->
+            <section id="shop-section" class="section active">
+                <div class="categories-bar" id="categories-list"></div>
+                <div class="products-grid" id="products-container"></div>
+            </section>
+
+            <!-- СЕКЦИЯ АДРЕСА -->
+            <section id="address-section" class="section" style="display: none;">
+                <div class="info-card">
+                    <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                    <h2>Наш адрес</h2>
+                    <p>Республика Беларусь, г. Минск, пр. Независимости-113</p>
+                    <p style="color: var(--primary); font-weight: bold; margin-top: 0.5rem;"><i class="fa-solid fa-train-subway"></i> ст.м. Московская</p>
+                    <p style="font-size: 0.85rem; margin-top: 1rem; color: var(--text-muted);">Режим работы: Ежедневно с 10:00 до 21:00</p>
+                </div>
+            </section>
+
+            <!-- СЕКЦИЯ КОНТАКТОВ -->
+            <section id="contacts-section" class="section" style="display: none;">
+                <div class="info-card">
+                    <i class="fa-solid fa-headset" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                    <h2>Свяжитесь с нами</h2>
+                    <p style="margin: 0.5rem 0;">Телефон: <strong>+375 (29) 123-45-67</strong></p>
+                    <p style="margin: 0.5rem 0;">Email: support@monetka-market.by</p>
+                    <p style="margin: 0.5rem 0;">Телеграм: @monetka_support</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- ПЛАВАЮЩАЯ КНОПКА ДОБАВЛЕНИЯ (ТОЛЬКО ДЛЯ АДМИНА) -->
+        <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+
+        <!-- НИЖНИЙ НАВИГАТОР (МОБИЛЬНЫЙ) -->
+        <nav class="mobile-nav">
+            <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
+                <i class="fa-solid fa-store"></i><span>Магазин</span>
+            </div>
+            <div onclick="switchTab('address')" id="nav-address" class="mobile-nav-item">
+                <i class="fa-solid fa-location-dot"></i><span>Адрес</span>
+            </div>
+            <div onclick="switchTab('contacts')" id="nav-contacts" class="mobile-nav-item">
+                <i class="fa-solid fa-phone"></i><span>Контакты</span>
+            </div>
+        </nav>
+
+    </div>
+
+    <!-- МОДАЛКА: АДМИН-ФОРМА -->
+    <div class="modal" id="admin-modal" style="display: none;">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
+            <h3 style="margin-bottom: 1.2rem;"><i class="fa-solid fa-box-open"></i> Добавить товар</h3>
+            
+            <div class="admin-form-group">
+                <label>Название товара:</label>
+                <input type="text" id="admin-title" class="admin-input" placeholder="Например: Худи Оверсайз">
+            </div>
+            <div class="admin-form-group">
+                <label>Цена (в BYN):</label>
+                <input type="number" id="admin-price" class="admin-input" placeholder="Например: 75">
+            </div>
+            <div class="admin-form-group">
+                <label>Категория:</label>
+                <select id="admin-category" class="admin-select">
+                    <option value="Электроника">Электроника</option>
+                    <option value="Одежда">Одежда</option>
+                    <option value="Дом">Дом</option>
+                </select>
+            </div>
+            
+            <!-- МУЛЬТИЗАГРУЗКА ФОТО (ДО 3 ШТУК) -->
+            <div class="admin-form-group">
+                <label>Фото товара (от 1 до 3 шт., необязательно):</label>
+                <div style="position: relative; overflow: hidden;">
+                    <div class="file-input-btn">
+                        <i class="fa-solid fa-camera"></i> Галерея / Камера
+                    </div>
+                    <!-- Атрибут multiple позволяет выбирать сразу несколько, а accept="image/*" вызывает камеру на смартфонах -->
+                    <input type="file" id="admin-file" accept="image/*" multiple onchange="handleMultipleFiles(event)" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
+                </div>
+                <div class="preview-thumbnails" id="thumb-container"></div>
+            </div>
+
+            <div class="admin-form-group">
+                <label>Описание:</label>
+                <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
+            </div>
+            
+            <button class="card-btn" style="margin-top: 0.5rem;" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: ПРОСМОТР ТОВАРA -->
+    <div class="modal" id="product-detail-modal" style="display: none;">
+        <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
+            <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
+            <div id="modal-detail-content"></div>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: КОРЗИНА -->
+    <div class="modal" id="cart-modal" style="display: none;">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
+            <h3 style="margin-bottom: 1.5rem;"><i class="fa-solid fa-basket-shopping"></i> Ваша корзина</h3>
+            <div id="cart-items-container"></div>
+            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                <h4>Итого:</h4>
+                <h3 id="cart-total-price" style="color: var(--primary);">0.00 BYN</h3>
+            </div>
+            <button class="card-btn" style="margin-top: 1rem;" onclick="alert('Заказ успешно оформлен!')">Оформить заказ</button>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

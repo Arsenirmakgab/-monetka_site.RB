@@ -1,0 +1,78 @@
+import telebot
+import requests
+import json
+
+# Твой новый секретный токен и база данных уже внутри
+BOT_TOKEN = "8704084609:AAEwIjRXbNYoXq3suV5IYqKF7LCEE_DgMls"
+JSONBIN_KEY = "$2a$10$7R3k4vj9G9hS8W4GjE7XUeK3k2x0D5Z5m0X8Z8q8y8u8i8o8p8e8i"
+JSONBIN_URL = "https://api.jsonbin.io/v3/b/663f7db2e41b4d34e4f2eb30"
+
+bot = telebot.TeleBot(BOT_TOKEN)
+
+def get_current_products():
+    headers = {"X-Master-Key": JSONBIN_KEY}
+    try:
+        response = requests.get(f"{JSONBIN_URL}/latest", headers=headers)
+        return response.json().get("record", [])
+    except:
+        return []
+
+def update_remote_db(products_list):
+    headers = {
+        "Content-Type": "application/json",
+        "X-Master-Key": JSONBIN_KEY
+    }
+    requests.put(JSONBIN_URL, json=products_list, headers=headers)
+
+# Создание новой карточки
+@bot.message_handler(content_types=['photo'])
+def handle_bot_product(message):
+    if message.caption and "Карточка:" in message.caption:
+        try:
+            caption_text = message.caption.strip()
+            lines = caption_text.split('\n')
+            
+            title, price, category, desc = "", 0, "Электроника", ""
+            for line in lines:
+                if line.startswith("Карточка:"): title = line.replace("Карточка:", "").strip()
+                elif line.startswith("Цена:"): price = float(line.replace("Цена:", "").replace(" ", "").strip())
+                elif line.startswith("Категория:"): category = line.replace("Категория:", "").strip()
+                elif line.startswith("Описание:"): desc = line.replace("Описание:", "").strip()
+
+            file_info = bot.get_file(message.photo[-1].file_id)
+            photo_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_info.file_path}"
+
+            new_product = {
+                "id": message.message_id,
+                "title": title,
+                "price": price,
+                "category": category,
+                "desc": desc,
+                "img": photo_url
+            }
+
+            current_products = get_current_products()
+            current_products.insert(0, new_product)
+            update_remote_db(current_products)
+
+            bot.reply_to(message, f"✅ **Карточка опубликована в белорусских рублях!**\nID карточки: {message.message_id}\n\n🗑 Чтобы удалить этот товар с сайта, просто отредактируйте это сообщение в ТГ на текст: `Удалить`")
+            print(f"Добавлен товар: {title}")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка заполнения карточки: {e}")
+
+# Удаление карточки при редактировании сообщения на "Удалить"
+@bot.edited_message_handler(func=lambda message: True)
+def handle_edit(message):
+    if message.caption and message.caption.strip().lower() == "удалить":
+        try:
+            current_products = get_current_products()
+            # Находим и вырезаем карточку по ID сообщения
+            updated_products = [p for p in current_products if p.get("id") != message.message_id]
+            update_remote_db(updated_products)
+            bot.reply_to(message, "🗑 Товар успешно удален из базы и стерт с сайта!")
+            print(f"Товар с ID {message.message_id} удален.")
+        except Exception as e:
+            bot.reply_to(message, f"❌ Ошибка удаления: {e}")
+
+print("Бот маркетплейса «Монетка» (BYN) запущен...")
+bot.infinity_polling()
