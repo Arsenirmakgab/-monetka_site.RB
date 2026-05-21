@@ -10,9 +10,10 @@ let uploadedImagesBase64 = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     applyAdminUI();
-    loadProductsFromCloud();
+    loadProducts(); // Умная загрузка локальной памяти + облака
     updateCartUI();
-    // Проверяем обновления раз в 20 секунд во избежание блокировок лимита
+    
+    // Проверяем обновления из облака каждые 20 секунд
     setInterval(loadProductsFromCloud, 20000); 
 });
 
@@ -29,26 +30,51 @@ function applyAdminUI() {
     }
 }
 
+// Умная загрузка: сначала берем локальные железные данные, потом ищем в облаке
+function loadProducts() {
+    const localData = localStorage.getItem('monetka_products_backup');
+    if (localData) {
+        products = JSON.parse(localData);
+        renderCategories();
+        renderProducts();
+    }
+    loadProductsFromCloud();
+}
+
 async function loadProductsFromCloud() {
     try {
         const response = await fetch(`${JSONBIN_URL}/latest`, {
             headers: { "X-Master-Key": JSONBIN_KEY }
         });
         const data = await response.json();
+        const cloudProducts = data.record || [];
         
-        if (JSON.stringify(products) !== JSON.stringify(data.record)) {
-            products = data.record || [];
+        // Если в облаке товаров больше или они другие — объединяем с локальными, убирая дубликаты
+        if (cloudProducts.length > 0) {
+            let combined = [...products, ...cloudProducts];
+            // Фильтруем дубли по ID
+            let uniqueMap = {};
+            combined.forEach(p => { uniqueMap[p.id] = p; });
+            products = Object.values(uniqueMap).sort((a,b) => b.id - a.id);
+            
+            localStorage.setItem('monetka_products_backup', JSON.stringify(products));
             renderCategories();
             renderProducts();
         }
     } catch (err) {
-        console.error("Ошибка синхронизации данных:", err);
+        console.log("Облако недоступно, работаем на локальной памяти телефона.");
     }
 }
 
 async function saveProductsToCloud(updatedList) {
+    // В ЛЮБОМ СЛУЧАЕ намертво сохраняем товар в память телефона
+    localStorage.setItem('monetka_products_backup', JSON.stringify(updatedList));
+    products = updatedList;
+    renderCategories();
+    renderProducts();
+
     try {
-        const response = await fetch(JSONBIN_URL, {
+        await fetch(JSONBIN_URL, {
             method: 'PUT',
             headers: {
                 "Content-Type": "application/json",
@@ -56,17 +82,8 @@ async function saveProductsToCloud(updatedList) {
             },
             body: JSON.stringify(updatedList)
         });
-        
-        if (response.ok) {
-            products = updatedList; 
-            renderCategories();
-            renderProducts(); 
-        } else {
-            const errorData = await response.json();
-            alert(`Ошибка сервера: ${errorData.message || 'Превышен размер файлов или лимит запросов.'}`);
-        }
     } catch (err) {
-        alert("Не удалось связаться с облаком. Проверьте интернет-соединение.");
+        console.log("Не удалось закинуть в облако, но в памяти телефона товар сохранен!");
     }
 }
 
@@ -159,12 +176,8 @@ function addNewProductFromSite() {
         images: [...uploadedImagesBase64] 
     };
 
-    // Мгновенная отрисовка на экране, чтобы товар не пропадал при отправке
-    products = [newProduct, ...products];
-    renderCategories();
-    renderProducts();
-
-    saveProductsToCloud(products);
+    const updatedList = [newProduct, ...products];
+    saveProductsToCloud(updatedList);
 
     document.getElementById('admin-title').value = '';
     document.getElementById('admin-price').value = '';
@@ -173,36 +186,27 @@ function addNewProductFromSite() {
     document.getElementById('thumb-container').innerHTML = '';
     
     closeModal('admin-modal');
-    alert("✅ Товар успешно опубликован!");
+    alert("✅ Товар успешно добавлен!");
 }
 
 function deleteProduct(id, event) {
     event.stopPropagation(); 
     if (confirm("Удалить этот товар из базы?")) {
         const updatedList = products.filter(p => p.id !== id);
-        // Сразу удаляем локально
-        products = updatedList;
-        renderProducts();
-        renderCategories();
         saveProductsToCloud(updatedList);
     }
 }
 
 function generateSliderHtml(productId, imagesArray) {
-    const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦+Товар'];
+    const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
     let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
     
     let arrowsHtml = '';
-    let dotsHtml = '';
-    
     if (imgs.length > 1) {
         arrowsHtml = `
-            <button class="slider-arrow prev" onclick="moveSlider(${productId}, -1, event)"><i class="fa-solid fa-chevron-left"></i></button>
-            <button class="slider-arrow next" onclick="moveSlider(${productId}, 1, event)"><i class="fa-solid fa-chevron-right"></i></button>
+            <button class="slider-arrow prev" onclick="moveSlider(${productId}, -1, event)">◀</button>
+            <button class="slider-arrow next" onclick="moveSlider(${productId}, 1, event)">▶</button>
         `;
-        dotsHtml = `<div class="slider-dots" id="dots-${productId}">` + 
-            imgs.map((_, i) => `<div class="slider-dot ${i === 0 ? 'active' : ''}"></div>`).join('') + 
-            `</div>`;
     }
 
     return `
@@ -211,7 +215,6 @@ function generateSliderHtml(productId, imagesArray) {
                 ${slidesHtml}
             </div>
             ${arrowsHtml}
-            ${dotsHtml}
         </div>
     `;
 }
@@ -231,15 +234,6 @@ function moveSlider(productId, direction, event) {
 
     slider.setAttribute('data-current', current);
     track.style.transform = `translateX(-${current * 100}%)`;
-
-    const dotsContainer = document.getElementById(`dots-${productId}`);
-    if (dotsContainer) {
-        const dots = dotsContainer.querySelectorAll('.slider-dot');
-        dots.forEach((dot, idx) => {
-            if (idx === current) dot.classList.add('active');
-            else dot.classList.remove('active');
-        });
-    }
 }
 
 function renderProducts() {
@@ -250,7 +244,7 @@ function renderProducts() {
     const filtered = currentCategory === 'all' ? products : products.filter(p => p.category === currentCategory);
 
     if (filtered.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 3rem 0; width:100%;">Товаров пока нет.</p>';
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0; grid-column: span 4;">Пусто</p>';
         return;
     }
 
@@ -259,20 +253,19 @@ function renderProducts() {
         card.className = 'product-card';
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
-        const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i> Удалить карточку</button>` : '';
+        const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
         const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
         const sliderHtml = generateSliderHtml(prod.id, imagesList);
 
         card.innerHTML = `
-            <div class="product-img-wrapper" style="height:auto;">
+            <div class="product-img-wrapper">
                 ${sliderHtml}
             </div>
             <div class="product-info">
-                <div class="product-price">${Number(prod.price).toLocaleString()} BYN</div>
+                <div class="product-price">${Number(prod.price)} BYN</div>
                 <div class="product-title">${prod.title}</div>
-                <div class="product-desc">${prod.desc}</div>
                 <button class="card-btn" onclick="addToCart(${prod.id}, event)">
-                    <i class="fa-solid fa-cart-plus"></i> В корзину
+                    <i class="fa-solid fa-cart-plus"></i>
                 </button>
                 ${deleteButtonHtml}
             </div>
@@ -300,7 +293,7 @@ function openDetailModal(id, event) {
             <div class="modal-price" style="font-size:1.6rem; color:var(--primary); font-weight:800; margin-bottom:1.2rem;">${Number(prod.price).toLocaleString()} BYN</div>
             <h3 style="margin-bottom: 0.4rem; font-size: 1rem; color:#fff;">Описание:</h3>
             <p style="color: var(--text-muted); line-height: 1.5; font-size:0.9rem;">${prod.desc}</p>
-            <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem;" onclick="addToCart(${prod.id}, null); closeModal('product-detail-modal');">
+            <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem;" onclick="addToCart(${prod.id}, null); closeModal('product-detail-modal');">
                 <i class="fa-solid fa-cart-plus"></i> Добавить в корзину
             </button>
         </div>
@@ -317,7 +310,6 @@ function switchTab(tabName) {
     const activeSection = document.getElementById(`${tabName}-section`);
     if (activeSection) activeSection.style.display = 'block';
 
-    // Скрываем или показываем блок категорий в зависимости от вкладки
     const categoriesWrapper = document.getElementById('categories-wrapper');
     if (categoriesWrapper) {
         categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
@@ -357,6 +349,7 @@ function addToCart(id, event) {
     updateCartUI();
 }
 
+// ... остальной код (removeFromCart, updateCartUI, openCartModal, renderCartItems, closeModal) остается без изменений
 function removeFromCart(index) {
     cart.splice(index, 1);
     localStorage.setItem('monetka_cart', JSON.stringify(cart));
