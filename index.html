@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Монетка Маркет</title>
-    <!-- Подключаем иконки -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
     <style>
@@ -35,7 +34,7 @@
             min-height: 100vh;
             color: var(--text-main);
             position: relative;
-            padding-bottom: 80px; /* Отступ под нижний навигатор */
+            padding-bottom: 80px;
             box-sizing: border-box;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
@@ -61,9 +60,9 @@
             align-items: center;
             gap: 0.5rem;
             user-select: none;
+            cursor: pointer;
         }
 
-        /* Кнопка админа в шапке (если залогинен) */
         .admin-badge {
             background: rgba(26, 188, 156, 0.2);
             border: 1px solid #1abc9c;
@@ -75,6 +74,16 @@
             display: flex;
             align-items: center;
             gap: 0.3rem;
+        }
+
+        /* Панель категорий - теперь закреплена выше, прямо под шапкой */
+        .sticky-categories {
+            position: sticky;
+            top: 62px;
+            z-index: 90;
+            background: var(--bg-main);
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.02);
         }
 
         /* Слайдер картинок в карточке */
@@ -139,7 +148,7 @@
             border-radius: 4px;
         }
 
-        /* Плавающая кнопка добавления для Админа */
+        /* Плавающая кнопка добавления товара для Админа */
         .float-add-btn {
             position: fixed;
             bottom: 85px;
@@ -149,7 +158,7 @@
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            display: none; /* Включается через JS */
+            display: none;
             justify-content: center;
             align-items: center;
             font-size: 1.5rem;
@@ -162,7 +171,7 @@
             .float-add-btn { right: 20px; }
         }
 
-        /* Стили превью файлов в форме */
+        /* Превью файлов в форме */
         .preview-thumbnails {
             display: flex;
             gap: 8px;
@@ -194,13 +203,12 @@
             justify-content: center;
         }
 
-        /* Контейнеры форм */
         .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
         .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
         .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
         .delete-card-btn { background: var(--danger); color: white; padding: 0.5rem; border: none; border-radius: 6px; font-weight: bold; font-size: 0.85rem; width: 100%; margin-top: 0.5rem; }
 
-        /* Нижний мобильный навигатор */
+        /* Нижний навигатор */
         .mobile-nav {
             position: fixed;
             bottom: 0;
@@ -231,7 +239,6 @@
 
     <div class="mobile-container">
         
-        <!-- ШАПКА -->
         <header>
             <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
             <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
@@ -244,15 +251,15 @@
             </button>
         </header>
 
-        <!-- ОСНОВНОЙ КОНТЕНТ -->
-        <main style="padding: 1rem;">
-            <!-- СЕКЦИЯ МАГАЗИНА -->
+        <div class="sticky-categories" id="categories-wrapper">
+            <div class="categories-bar" id="categories-list"></div>
+        </div>
+
+        <main style="padding: 0 1rem 1rem 1rem;">
             <section id="shop-section" class="section active">
-                <div class="categories-bar" id="categories-list"></div>
                 <div class="products-grid" id="products-container"></div>
             </section>
 
-            <!-- СЕКЦИЯ АДРЕСА -->
             <section id="address-section" class="section" style="display: none;">
                 <div class="info-card">
                     <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
@@ -263,24 +270,21 @@
                 </div>
             </section>
 
-            <!-- СЕКЦИЯ КОНТАКТОВ -->
             <section id="contacts-section" class="section" style="display: none;">
                 <div class="info-card">
                     <i class="fa-solid fa-headset" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
                     <h2>Свяжитесь с нами</h2>
-                    <p style="margin: 0.5rem 0;">Телефон: <strong>+375 (29) 123-45-67</strong></p>
+                    <p style="margin: 0.8rem 0; font-size: 1.1rem;">Телефон: <a href="tel:+375296642707" style="color: var(--primary); text-decoration: none; font-weight: bold;">+375(29)6642707</a></p>
                     <p style="margin: 0.5rem 0;">Email: support@monetka-market.by</p>
                     <p style="margin: 0.5rem 0;">Телеграм: @monetka_support</p>
                 </div>
             </section>
         </main>
 
-        <!-- ПЛАВАЮЩАЯ КНОПКА ДОБАВЛЕНИЯ (ТОЛЬКО ДЛЯ АДМИНА) -->
         <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
             <i class="fa-solid fa-plus"></i>
         </button>
 
-        <!-- НИЖНИЙ НАВИГАТОР (МОБИЛЬНЫЙ) -->
         <nav class="mobile-nav">
             <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
                 <i class="fa-solid fa-store"></i><span>Магазин</span>
@@ -295,7 +299,6 @@
 
     </div>
 
-    <!-- МОДАЛКА: АДМИН-ФОРМА -->
     <div class="modal" id="admin-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
@@ -318,14 +321,12 @@
                 </select>
             </div>
             
-            <!-- МУЛЬТИЗАГРУЗКА ФОТО (ДО 3 ШТУК) -->
             <div class="admin-form-group">
                 <label>Фото товара (от 1 до 3 шт., необязательно):</label>
                 <div style="position: relative; overflow: hidden;">
                     <div class="file-input-btn">
                         <i class="fa-solid fa-camera"></i> Галерея / Камера
                     </div>
-                    <!-- Атрибут multiple позволяет выбирать сразу несколько, а accept="image/*" вызывает камеру на смартфонах -->
                     <input type="file" id="admin-file" accept="image/*" multiple onchange="handleMultipleFiles(event)" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
                 </div>
                 <div class="preview-thumbnails" id="thumb-container"></div>
@@ -340,7 +341,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: ПРОСМОТР ТОВАРA -->
     <div class="modal" id="product-detail-modal" style="display: none;">
         <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
             <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
@@ -348,7 +348,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: КОРЗИНА -->
     <div class="modal" id="cart-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
