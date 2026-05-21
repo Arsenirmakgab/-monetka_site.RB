@@ -25,7 +25,6 @@
             justify-content: center;
         }
 
-        /* Мобильный контейнер */
         .mobile-container {
             width: 100%;
             max-width: 480px;
@@ -84,7 +83,7 @@
             border-bottom: 1px solid rgba(255,255,255,0.02);
         }
 
-        /* Мощная адаптивная сетка: СТРОГО 4 КАРТОЧКИ В РЯД */
+        /* ЧЕТКАЯ СЕТКА: 4 КАРТОЧКИ В РЯД */
         .products-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr) !important; 
@@ -92,7 +91,7 @@
             padding: 0 !important;
         }
 
-        /* Компактная карточка под формат "4 в ряд" */
+        /* Сверхкомпактная карточка */
         .product-card {
             background: var(--bg-card);
             border-radius: 8px;
@@ -102,13 +101,23 @@
             justify-content: space-between;
             position: relative;
             border: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer;
         }
 
-        /* Уменьшаем высоту слайдера для маленьких карточек */
+        /* Главное фото на витрине — аккуратный квадрат */
+        .product-main-photo {
+            width: 100%;
+            height: 85px; /* Уменьшенная высота, чтобы карточки не были длинными */
+            object-fit: cover;
+            background: #151d2a;
+            display: block;
+        }
+
+        /* Слайдер картинок ВНУТРИ модального окна */
         .product-slider {
             position: relative;
             width: 100%;
-            height: 90px; 
+            height: 250px; 
             overflow: hidden;
             background: #151d2a;
         }
@@ -134,44 +143,44 @@
             background: rgba(0,0,0,0.6);
             color: white;
             border: none;
-            padding: 2px 4px;
-            border-radius: 4px;
-            font-size: 0.6rem;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
             z-index: 5;
+            cursor: pointer;
         }
-        .slider-arrow.prev { left: 2px; }
-        .slider-arrow.next { right: 2px; }
+        .slider-arrow.prev { left: 8px; }
+        .slider-arrow.next { right: 8px; }
 
-        /* Компактный текст внутри карточки */
+        /* Текст внутри компактной карточки */
         .product-info {
-            padding: 6px;
+            padding: 5px;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 1px;
         }
         .product-price {
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 800;
             color: var(--primary);
+            white-space: nowrap;
         }
         .product-title {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             color: #fff;
-        }
-        .product-desc {
-            display: none; /* Прячем описание на витрине, чтобы влезло 4 в ряд. Оно будет видно при клике! */
+            margin-bottom: 2px;
         }
         
-        /* Кнопка "В корзину" и "Удалить" маленькие под размер */
+        /* Мини-кнопки для витрины */
         .card-btn {
             background: #2ecc71;
             color: white;
             border: none;
-            padding: 5px;
+            padding: 4px;
             border-radius: 4px;
             font-size: 0.65rem;
             font-weight: bold;
@@ -182,12 +191,12 @@
         .delete-card-btn {
             background: var(--danger);
             color: white;
-            padding: 4px;
+            padding: 3px;
             border: none;
             border-radius: 4px;
             font-size: 0.6rem;
             width: 100%;
-            margin-top: 3px;
+            margin-top: 2px;
         }
 
         /* Плавающая кнопка добавления */
@@ -213,43 +222,16 @@
             .float-add-btn { right: 20px; }
         }
 
-        /* Превью файлов в форме */
-        .preview-thumbnails {
-            display: flex;
-            gap: 8px;
-            margin-top: 0.8rem;
-            overflow-x: auto;
-        }
-        .thumb-wrapper {
-            position: relative;
-            width: 70px;
-            height: 70px;
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.2);
-        }
+        /* Админка превью */
+        .preview-thumbnails { display: flex; gap: 8px; margin-top: 0.8rem; overflow-x: auto; }
+        .thumb-wrapper { position: relative; width: 70px; height: 70px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); }
         .thumb-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-        .thumb-remove {
-            position: absolute;
-            top: 2px;
-            right: 2px;
-            background: rgba(239,68,68,0.8);
-            color: white;
-            border: none;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            font-size: 0.65rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .thumb-remove { position: absolute; top: 2px; right: 2px; background: rgba(239,68,68,0.8); color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; }
 
         .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
         .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
         .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
 
-        /* Нижний навигатор */
         .mobile-nav {
             position: fixed;
             bottom: 0;
@@ -262,16 +244,7 @@
             border-top: 1px solid rgba(255,255,255,0.05);
             z-index: 100;
         }
-        .mobile-nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            text-decoration: none;
-            cursor: pointer;
-            gap: 4px;
-        }
+        .mobile-nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 0.75rem; text-decoration: none; cursor: pointer; gap: 4px; }
         .mobile-nav-item.active { color: var(--primary); }
         .mobile-nav-item i { font-size: 1.2rem; }
     </style>
@@ -296,7 +269,7 @@
             <div class="categories-bar" id="categories-list"></div>
         </div>
 
-        <main style="padding: 0 8px 8px 8px;">
+        <main style="padding: 0 6px 6px 6px;">
             <section id="shop-section" class="section active">
                 <div class="products-grid" id="products-container"></div>
             </section>
