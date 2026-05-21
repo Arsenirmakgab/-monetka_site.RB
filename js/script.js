@@ -5,18 +5,17 @@ let products = [];
 let cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
 let currentCategory = 'all';
 
-// Проверяем сохраненную сессию администратора в localStorage
 let isAdminMode = localStorage.getItem('monetka_admin') === 'true';
-let uploadedImagesBase64 = []; // Массив строк картинок (макс 3 штуки)
+let uploadedImagesBase64 = []; 
 
 document.addEventListener('DOMContentLoaded', () => {
     applyAdminUI();
     loadProductsFromCloud();
     updateCartUI();
-    setInterval(loadProductsFromCloud, 5000);
+    // Проверяем обновления раз в 20 секунд во избежание блокировок лимита
+    setInterval(loadProductsFromCloud, 20000); 
 });
 
-// Настройка интерфейса в зависимости от того, админ пользователь или нет
 function applyAdminUI() {
     const indicator = document.getElementById('admin-indicator');
     const floatBtn = document.getElementById('panel-add-btn');
@@ -30,7 +29,6 @@ function applyAdminUI() {
     }
 }
 
-// Загрузка данных из облака
 async function loadProductsFromCloud() {
     try {
         const response = await fetch(`${JSONBIN_URL}/latest`, {
@@ -44,11 +42,10 @@ async function loadProductsFromCloud() {
             renderProducts();
         }
     } catch (err) {
-        console.error("Ошибка синхронизации:", err);
+        console.error("Ошибка синхронизации данных:", err);
     }
 }
 
-// Сохранение данных в облако
 async function saveProductsToCloud(updatedList) {
     try {
         const response = await fetch(JSONBIN_URL, {
@@ -59,17 +56,20 @@ async function saveProductsToCloud(updatedList) {
             },
             body: JSON.stringify(updatedList)
         });
+        
         if (response.ok) {
             products = updatedList; 
             renderCategories();
             renderProducts(); 
+        } else {
+            const errorData = await response.json();
+            alert(`Ошибка сервера: ${errorData.message || 'Превышен размер файлов или лимит запросов.'}`);
         }
     } catch (err) {
-        alert("Не удалось обновить каталог в облаке.");
+        alert("Не удалось связаться с облаком. Проверьте интернет-соединение.");
     }
 }
 
-// Клик по логотипу — если не админ, предлагает войти
 function handleLogoClick() {
     switchTab('shop');
     if (!isAdminMode) {
@@ -77,14 +77,13 @@ function handleLogoClick() {
         if (pass === "13579") {
             localStorage.setItem('monetka_admin', 'true');
             alert("Вход выполнен! Страница будет перезагружена.");
-            location.reload(); // Перезагрузка устройства с видом админа
+            location.reload(); 
         } else if (pass !== null) {
             alert("Неверный пароль!");
         }
     }
 }
 
-// Выход из режима администратора
 function logoutAdmin() {
     if (confirm("Выйти из режима администратора?")) {
         localStorage.removeItem('monetka_admin');
@@ -93,7 +92,6 @@ function logoutAdmin() {
     }
 }
 
-// Обработка мультизагрузки фото (до 3-х штук)
 function handleMultipleFiles(event) {
     const files = Array.from(event.target.files);
     
@@ -115,11 +113,9 @@ function handleMultipleFiles(event) {
         };
         reader.readAsDataURL(file);
     });
-    // Сбрасываем инпут, чтобы можно было выбирать те же файлы
     event.target.value = "";
 }
 
-// Отрисовка миниатюр в форме добавления
 function renderThumbnails() {
     const container = document.getElementById('thumb-container');
     if (!container) return;
@@ -143,7 +139,6 @@ function openAdminModal() {
     document.getElementById('admin-modal').style.display = 'flex';
 }
 
-// Публикация карточки товара
 function addNewProductFromSite() {
     const title = document.getElementById('admin-title').value.trim();
     const price = document.getElementById('admin-price').value;
@@ -161,18 +156,21 @@ function addNewProductFromSite() {
         price: parseFloat(price),
         category: category,
         desc: desc || "Описание отсутствует.",
-        // Сохраняем массив картинок (или пустой массив, если фото не прикрепили)
         images: [...uploadedImagesBase64] 
     };
 
-    const updatedList = [newProduct, ...products];
-    saveProductsToCloud(updatedList);
+    // Мгновенная отрисовка на экране, чтобы товар не пропадал при отправке
+    products = [newProduct, ...products];
+    renderCategories();
+    renderProducts();
 
-    // Сброс формы и закрытие
+    saveProductsToCloud(products);
+
     document.getElementById('admin-title').value = '';
     document.getElementById('admin-price').value = '';
     document.getElementById('admin-desc').value = '';
     uploadedImagesBase64 = [];
+    document.getElementById('thumb-container').innerHTML = '';
     
     closeModal('admin-modal');
     alert("✅ Товар успешно опубликован!");
@@ -182,15 +180,16 @@ function deleteProduct(id, event) {
     event.stopPropagation(); 
     if (confirm("Удалить этот товар из базы?")) {
         const updatedList = products.filter(p => p.id !== id);
+        // Сразу удаляем локально
+        products = updatedList;
+        renderProducts();
+        renderCategories();
         saveProductsToCloud(updatedList);
     }
 }
 
-// Генерация слайдера (карусели изображений) для карточки товара
 function generateSliderHtml(productId, imagesArray) {
-    // Если картинок вообще нет, ставим стандартную коробку-заглушку
     const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦+Товар'];
-    
     let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
     
     let arrowsHtml = '';
@@ -217,7 +216,6 @@ function generateSliderHtml(productId, imagesArray) {
     `;
 }
 
-// Управление свайпом/клик слайдера
 function moveSlider(productId, direction, event) {
     if (event) event.stopPropagation();
     const slider = document.getElementById(`slider-${productId}`);
@@ -234,7 +232,6 @@ function moveSlider(productId, direction, event) {
     slider.setAttribute('data-current', current);
     track.style.transform = `translateX(-${current * 100}%)`;
 
-    // Обновление точек индикатора
     const dotsContainer = document.getElementById(`dots-${productId}`);
     if (dotsContainer) {
         const dots = dotsContainer.querySelectorAll('.slider-dot');
@@ -263,8 +260,6 @@ function renderProducts() {
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
         const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i> Удалить карточку</button>` : '';
-        
-        // Поддерживаем старую структуру 'img' и новую 'images' для стабильности
         const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
         const sliderHtml = generateSliderHtml(prod.id, imagesList);
 
@@ -293,8 +288,6 @@ function openDetailModal(id, event) {
 
     const content = document.getElementById('modal-detail-content');
     const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
-    
-    // Генерируем уникальный слайдер для модального окна (ID делаем отрицательным, чтоб не путать с витриной)
     const modalSliderHtml = generateSliderHtml(-prod.id, imagesList);
 
     content.innerHTML = `
@@ -315,7 +308,6 @@ function openDetailModal(id, event) {
     document.getElementById('product-detail-modal').style.display = 'flex';
 }
 
-// Смена разделов таба в нижнем меню
 function switchTab(tabName) {
     document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
     const activeNav = document.getElementById(`nav-${tabName}`);
@@ -324,6 +316,12 @@ function switchTab(tabName) {
     document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
     const activeSection = document.getElementById(`${tabName}-section`);
     if (activeSection) activeSection.style.display = 'block';
+
+    // Скрываем или показываем блок категорий в зависимости от вкладки
+    const categoriesWrapper = document.getElementById('categories-wrapper');
+    if (categoriesWrapper) {
+        categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
+    }
 }
 
 function renderCategories() {
