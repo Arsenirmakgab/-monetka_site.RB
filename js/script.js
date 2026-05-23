@@ -1,20 +1,20 @@
-const JSONBIN_URL = "https://api.jsonbin.io/v3/b/663f7db2e41b4d34e4f2eb30";
-const JSONBIN_KEY = "$2a$10$7R3k4vj9G9hS8W4GjE7XUeK3k2x0D5Z5m0X8Z8q8y8u8i8o8p8e8i"; 
+// Инициализируем созданную базу данных Firebase Realtime Database
+const firebaseConfig = {
+    databaseURL: "https://monetka-market-default-rtdb.europe-west1.firebasedatabase.app/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 let products = [];
 let cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
 let currentCategory = 'all';
-
 let isAdminMode = localStorage.getItem('monetka_admin') === 'true';
 let uploadedImagesBase64 = []; 
 
 document.addEventListener('DOMContentLoaded', () => {
     applyAdminUI();
-    loadProducts(); 
     updateCartUI();
-    
-    // Проверяем обновления раз в 20 секунд
-    setInterval(loadProductsFromCloud, 20000); 
+    listenToCloudProducts(); // Слушаем базу в реальном времени
 });
 
 function applyAdminUI() {
@@ -29,57 +29,29 @@ function applyAdminUI() {
     }
 }
 
-function loadProducts() {
-    const localData = localStorage.getItem('monetka_products_backup');
-    if (localData) {
-        products = JSON.parse(localData);
+// УМНАЯ СИНХРОНИЗАЦИЯ: Firebase сам обновляет экран при любых изменениях на сервере
+function listenToCloudProducts() {
+    db.ref('products').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            // Превращаем объект Firebase в массив и сортируем (новые сверху)
+            products = Object.values(data).sort((a, b) => b.id - a.id);
+        } else {
+            products = [];
+        }
+        // Бекапим локально на всякий случай
+        localStorage.setItem('monetka_products_backup', JSON.stringify(products));
         renderCategories();
         renderProducts();
-    }
-    loadProductsFromCloud();
-}
-
-async function loadProductsFromCloud() {
-    try {
-        const response = await fetch(`${JSONBIN_URL}/latest`, {
-            headers: { "X-Master-Key": JSONBIN_KEY }
-        });
-        const data = await response.json();
-        const cloudProducts = data.record || [];
-        
-        if (cloudProducts.length > 0) {
-            let combined = [...products, ...cloudProducts];
-            let uniqueMap = {};
-            combined.forEach(p => { uniqueMap[p.id] = p; });
-            products = Object.values(uniqueMap).sort((a,b) => b.id - a.id);
-            
-            localStorage.setItem('monetka_products_backup', JSON.stringify(products));
+    }, (error) => {
+        console.log("Ошибка Firebase, работаем на локальном бекапе:", error);
+        const localData = localStorage.getItem('monetka_products_backup');
+        if (localData) {
+            products = JSON.parse(localData);
             renderCategories();
             renderProducts();
         }
-    } catch (err) {
-        console.log("Облако недоступно, работаем на внутренней памяти.");
-    }
-}
-
-async function saveProductsToCloud(updatedList) {
-    localStorage.setItem('monetka_products_backup', JSON.stringify(updatedList));
-    products = updatedList;
-    renderCategories();
-    renderProducts();
-
-    try {
-        await fetch(JSONBIN_URL, {
-            method: 'PUT',
-            headers: {
-                "Content-Type": "application/json",
-                "X-Master-Key": JSONBIN_KEY
-            },
-            body: JSON.stringify(updatedList)
-        });
-    } catch (err) {
-        console.log("Товар зафиксирован в локальной памяти.");
-    }
+    });
 }
 
 function handleLogoClick() {
@@ -111,8 +83,9 @@ function handleMultipleFiles(event) {
     }
 
     files.forEach(file => {
-        if (file.size > 2 * 1024 * 1024) {
-            alert(`Файл ${file.name} больше 2МБ!`);
+        // Ужимаем лимит до 1.5МБ на картинку, Firebase это проглотит без проблем
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert(`Файл ${file.name} слишком много весит (лимит 1.5МБ)! Попробуй сделать скриншот картинки или немного сжать.`);
             return;
         }
         const reader = new FileReader();
@@ -158,8 +131,9 @@ function addNewProductFromSite() {
         return;
     }
 
+    const productId = Date.now();
     const newProduct = {
-        id: Date.now(), 
+        id: productId, 
         title: title,
         price: parseFloat(price),
         category: category,
@@ -167,27 +141,35 @@ function addNewProductFromSite() {
         images: [...uploadedImagesBase64] 
     };
 
-    const updatedList = [newProduct, ...products];
-    saveProductsToCloud(updatedList);
-
-    document.getElementById('admin-title').value = '';
-    document.getElementById('admin-price').value = '';
-    document.getElementById('admin-desc').value = '';
-    uploadedImagesBase64 = [];
-    
-    closeModal('admin-modal');
-    alert("✅ Товар успешно добавлен!");
+    // Сохраняем в Firebase по уникальному ключу (id товара)
+    db.ref('products/' + productId).set(newProduct)
+    .then(() => {
+        document.getElementById('admin-title').value = '';
+        document.getElementById('admin-price').value = '';
+        document.getElementById('admin-desc').value = '';
+        uploadedImagesBase64 = [];
+        closeModal('admin-modal');
+        alert("✅ Товар успешно опубликован на всех устройствах!");
+    })
+    .catch((err) => {
+        alert("Ошибка отправки в облако Firebase. Проверь размер фото.");
+        console.error(err);
+    });
 }
 
 function deleteProduct(id, event) {
     event.stopPropagation(); 
-    if (confirm("Удалить этот товар?")) {
-        const updatedList = products.filter(p => p.id !== id);
-        saveProductsToCloud(updatedList);
+    if (confirm("Удалить этот товар? Он исчезнет со всех устройств.")) {
+        db.ref('products/' + id).remove()
+        .then(() => {
+            console.log("Товар удален из Firebase");
+        })
+        .catch((err) => {
+            alert("Не удалось удалить товар из облака");
+        });
     }
 }
 
-// Генерация HTML-слайдера (вызывается теперь ТОЛЬКО в подробном просмотре)
 function generateSliderHtml(productId, imagesArray) {
     const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
     let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
@@ -227,7 +209,6 @@ function moveSlider(productId, direction, event) {
     track.style.transform = `translateX(-${current * 100}%)`;
 }
 
-// Отрисовка товаров на витрине (Только 1 главное фото!)
 function renderProducts() {
     const container = document.getElementById('products-container');
     if (!container) return;
@@ -236,7 +217,7 @@ function renderProducts() {
     const filtered = currentCategory === 'all' ? products : products.filter(p => p.category === currentCategory);
 
     if (filtered.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0; grid-column: span 4;">Пусто</p>';
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0; grid-column: span 3; font-size:0.8rem;">Товаров пока нет.</p>';
         return;
     }
 
@@ -245,37 +226,40 @@ function renderProducts() {
         card.className = 'product-card';
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
-        const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
+        const deleteButtonHtml = isAdminMode ? `
+            <button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)">
+                <i class="fa-solid fa-trash"></i>
+            </button>` : '';
         
-        // Берем только самое первое фото для обложки на витрине
-        const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
-        const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x150/1f293d/ffffff?text=📦';
+        const imagesList = prod.images ? Object.values(prod.images) : [];
+        const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
 
         card.innerHTML = `
             <img src="${coverPhoto}" class="product-main-photo" loading="lazy">
             <div class="product-info">
-                <div class="product-price">${Number(prod.price)} BYN</div>
-                <div class="product-title">${prod.title}</div>
-                <button class="card-btn" onclick="addToCart(${prod.id}, event)">
-                    <i class="fa-solid fa-cart-plus"></i>
-                </button>
-                ${deleteButtonHtml}
+                <div>
+                    <div class="product-price">${Number(prod.price)} BYN</div>
+                    <div class="product-title">${prod.title}</div>
+                </div>
+                <div class="card-actions-row">
+                    <button class="card-btn" onclick="addToCart(${prod.id}, event)">
+                        <i class="fa-solid fa-cart-plus"></i>
+                    </button>
+                    ${deleteButtonHtml}
+                </div>
             </div>
         `;
         container.appendChild(card);
     });
 }
 
-// ПОДРОБНЫЙ ПРОСМОТР ТОВАРА (Вот здесь разворачивается слайдер всех фоток)
 function openDetailModal(id, event) {
     if (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn')) return;
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
     const content = document.getElementById('modal-detail-content');
-    const imagesList = prod.images ? prod.images : (prod.img ? [prod.img] : []);
-    
-    // Передаем уникальный ID для слайдера в модалке
+    const imagesList = prod.images ? Object.values(prod.images) : [];
     const modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
 
     content.innerHTML = `
@@ -373,7 +357,7 @@ function renderCartItems() {
     let total = 0;
     container.innerHTML = cart.map((item, index) => {
         total += Number(item.price);
-        const imagesList = item.images ? item.images : (item.img ? [item.img] : []);
+        const imagesList = item.images ? Object.values(item.images) : [];
         const itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
         return `
             <div class="cart-item">
