@@ -1,476 +1,410 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Монетка Маркет</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+// Инициализируем созданную базу данных Firebase Realtime Database
+const firebaseConfig = {
+    databaseURL: "https://monetka-market-default-rtdb.europe-west1.firebasedatabase.app/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let products = [];
+let cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
+let currentCategory = 'all';
+let isAdminMode = localStorage.getItem('monetka_admin') === 'true';
+let uploadedImagesBase64 = []; 
+
+document.addEventListener('DOMContentLoaded', () => {
+    applyAdminUI();
+    updateCartUI();
+    listenToCloudProducts(); // Слушаем базу в реальном времени
+});
+
+function applyAdminUI() {
+    const indicator = document.getElementById('admin-indicator');
+    const floatBtn = document.getElementById('panel-add-btn');
+    if (isAdminMode) {
+        if (indicator) indicator.style.display = 'flex';
+        if (floatBtn) floatBtn.style.display = 'flex';
+    } else {
+        if (indicator) indicator.style.display = 'none';
+        if (floatBtn) floatBtn.style.display = 'none';
+    }
+}
+
+// УМНАЯ СИНХРОНИЗАЦИЯ: Firebase сам обновляет экран при любых изменениях на сервере
+function listenToCloudProducts() {
+    db.ref('products').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            products = Object.values(data).sort((a, b) => b.id - a.id);
+        } else {
+            products = [];
+        }
+        localStorage.setItem('monetka_products_backup', JSON.stringify(products));
+        renderCategories();
+        renderProducts();
+    }, (error) => {
+        console.log("Ошибка Firebase, работаем на локальном бекапе:", error);
+        const localData = localStorage.getItem('monetka_products_backup');
+        if (localData) {
+            products = JSON.parse(localData);
+            renderCategories();
+            renderProducts();
+        }
+    });
+}
+
+function handleLogoClick() {
+    switchTab('shop');
+    if (!isAdminMode) {
+        let pass = prompt("Введите пароль:");
+        if (pass === "13579") {
+            localStorage.setItem('monetka_admin', 'true');
+            alert("Вход выполнен!");
+            location.reload(); 
+        } else if (pass !== null) {
+            alert("Неверный пароль!");
+        }
+    }
+}
+
+function logoutAdmin() {
+    if (confirm("Выйти?")) {
+        localStorage.removeItem('monetka_admin');
+        location.reload();
+    }
+}
+
+// ФУНКЦИЯ УМНОГО СЖАТИЯ КАРТИНКИ (Принимает файлы хоть по 10-20 МБ)
+function compressImage(file, callback) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function (event) {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = function () {
+            const canvas = document.createElement('canvas');
+            
+            // Задаем оптимальный размер для мобильной карточки товара
+            let width = img.width;
+            let height = img.height;
+            const max_size = 800; // Сжимаем до 800px по большей стороне
+
+            if (width > height) {
+                if (width > max_size) {
+                    height *= max_size / width;
+                    width = max_size;
+                }
+            } else {
+                if (height > max_size) {
+                    width *= max_size / height;
+                    height = max_size;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Превращаем в JPEG с качеством 70% (визуально разницы нет, но вес падает в 50 раз)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            callback(compressedBase64);
+        };
+    };
+}
+
+function handleMultipleFiles(event) {
+    const files = Array.from(event.target.files);
+    if (uploadedImagesBase64.length + files.length > 3) {
+        alert("Можно загрузить максимум 3 фото!");
+        return;
+    }
+
+    files.forEach(file => {
+        // Ограничений на входной размер больше нет! compressImage переварит всё
+        compressImage(file, function(compressedBase64) {
+            uploadedImagesBase64.push(compressedBase64);
+            renderThumbnails();
+        });
+    });
+    event.target.value = "";
+}
+
+function renderThumbnails() {
+    const container = document.getElementById('thumb-container');
+    if (!container) return;
+    container.innerHTML = uploadedImagesBase64.map((img, idx) => `
+        <div class="thumb-wrapper">
+            <img src="${img}">
+            <button class="thumb-remove" onclick="removeThumbnail(${idx})">&times;</button>
+        </div>
+    `).join('');
+}
+
+function removeThumbnail(index) {
+    uploadedImagesBase64.splice(index, 1);
+    renderThumbnails();
+}
+
+function openAdminModal() {
+    uploadedImagesBase64 = [];
+    renderThumbnails();
+    document.getElementById('admin-modal').style.display = 'flex';
+}
+
+function addNewProductFromSite() {
+    const title = document.getElementById('admin-title').value.trim();
+    const price = document.getElementById('admin-price').value;
+    const category = document.getElementById('admin-category').value;
+    const desc = document.getElementById('admin-desc').value.trim();
+
+    if (!title || !price) {
+        alert("Заполните поля!");
+        return;
+    }
+
+    const productId = Date.now();
+    const newProduct = {
+        id: productId, 
+        title: title,
+        price: parseFloat(price),
+        category: category,
+        desc: desc || "Описание отсутствует.",
+        images: [...uploadedImagesBase64] 
+    };
+
+    db.ref('products/' + productId).set(newProduct)
+    .then(() => {
+        document.getElementById('admin-title').value = '';
+        document.getElementById('admin-price').value = '';
+        document.getElementById('admin-desc').value = '';
+        uploadedImagesBase64 = [];
+        closeModal('admin-modal');
+        alert("✅ Товар успешно опубликован на всех устройствах!");
+    })
+    .catch((err) => {
+        alert("Ошибка отправки в облако. Попробуйте еще раз.");
+        console.error(err);
+    });
+}
+
+function deleteProduct(id, event) {
+    event.stopPropagation(); 
+    if (confirm("Удалить этот товар? Он исчезнет со всех устройств.")) {
+        db.ref('products/' + id).remove()
+        .then(() => {
+            console.log("Товар удален из Firebase");
+        })
+        .catch((err) => {
+            alert("Не удалось удалить товар из облака");
+        });
+    }
+}
+
+function generateSliderHtml(productId, imagesArray) {
+    const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
+    let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
     
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    let arrowsHtml = '';
+    if (imgs.length > 1) {
+        arrowsHtml = `
+            <button class="slider-arrow prev" onclick="moveSlider(${productId}, -1, event)">◀</button>
+            <button class="slider-arrow next" onclick="moveSlider(${productId}, 1, event)">▶</button>
+        `;
+    }
 
-    <style>
-        :root {
-            --bg-main: #131a26;
-            --bg-card: #1f293d;
-            --primary: #ffd700;
-            --text-main: #ffffff;
-            --text-muted: #8fa0ba;
-            --danger: #ef4444;
-        }
-
-        body {
-            background-color: #0b0f17;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            justify-content: center;
-        }
-
-        .mobile-container {
-            width: 100%;
-            max-width: 480px;
-            background: var(--bg-main);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            color: var(--text-main);
-            position: relative;
-            box-sizing: border-box;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            overflow: hidden;
-        }
-
-        header {
-            background: var(--bg-card);
-            padding: 0.7rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-
-        .logo {
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: var(--text-main);
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            user-select: none;
-            cursor: pointer;
-        }
-
-        .admin-badge {
-            background: rgba(26, 188, 156, 0.2);
-            border: 1px solid #1abc9c;
-            color: #1abc9c;
-            padding: 0.15rem 0.4rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 0.2rem;
-        }
-
-        .cart-icon-btn {
-            background: transparent;
-            border: none;
-            color: #fff;
-            font-size: 1.2rem;
-            position: relative;
-            cursor: pointer;
-        }
-        .cart-count {
-            position: absolute;
-            top: -7px;
-            right: -10px;
-            background: var(--danger);
-            font-size: 0.65rem;
-            padding: 2px 5px;
-            border-radius: 10px;
-            font-weight: bold;
-        }
-
-        .sticky-categories {
-            background: var(--bg-main);
-            padding: 0.5rem 0.3rem;
-            border-bottom: 1px solid rgba(255,255,255,0.02);
-            flex-shrink: 0;
-        }
-        .categories-bar {
-            display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            padding-bottom: 2px;
-        }
-        .categories-bar::-webkit-scrollbar { display: none; }
-        .category-chip {
-            background: var(--bg-card);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            white-space: nowrap;
-            cursor: pointer;
-            border: 1px solid rgba(255,255,255,0.05);
-        }
-        .category-chip.active {
-            background: var(--primary);
-            color: #000;
-            font-weight: bold;
-        }
-
-        main {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 4px;
-            box-sizing: border-box;
-        }
-
-        .products-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr) !important; 
-            gap: 6px !important; 
-            padding: 0 !important;
-            box-sizing: border-box;
-        }
-
-        .product-card {
-            background: var(--bg-card);
-            border-radius: 8px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            border: 1px solid rgba(255,255,255,0.03);
-            cursor: pointer;
-            box-sizing: border-box;
-            height: calc((100vh - 200px) / 3); 
-            min-height: 160px;
-        }
-
-        .product-main-photo {
-            width: 100%;
-            height: 55%;
-            object-fit: cover;
-            background: #151d2a;
-            display: block;
-            flex-shrink: 0;
-        }
-
-        .product-info {
-            padding: 4px 6px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 45%; 
-            box-sizing: border-box;
-        }
-        
-        .product-price {
-            font-size: 0.8rem;
-            font-weight: 800;
-            color: var(--primary);
-            white-space: nowrap;
-        }
-        
-        .product-title {
-            font-size: 0.65rem;
-            font-weight: 400;
-            line-height: 1.2;
-            color: #d1dbe5;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;  
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 1px;
-        }
-        
-        .card-actions-row {
-            display: flex;
-            gap: 4px;
-            margin-top: auto;
-            flex-shrink: 0;
-        }
-
-        .card-btn {
-            background: #2ecc71;
-            color: white;
-            border: none;
-            padding: 5px 0;
-            border-radius: 5px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            flex-grow: 1;
-            cursor: pointer;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 24px;
-            box-sizing: border-box;
-        }
-        
-        .delete-card-btn {
-            background: var(--danger);
-            color: white;
-            height: 24px;
-            width: 24px;
-            border: none;
-            border-radius: 5px;
-            font-size: 0.65rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            box-sizing: border-box;
-        }
-
-        .product-slider {
-            position: relative;
-            width: 100%;
-            height: 280px; 
-            overflow: hidden;
-            background: #151d2a;
-        }
-        .slider-track {
-            display: flex;
-            width: 100%;
-            height: 100%;
-            transition: transform 0.3s ease-in-out;
-        }
-        .slider-slide { min-width: 100%; height: 100%; }
-        .slider-slide img { width: 100%; height: 100%; object-fit: cover; }
-        .slider-arrow {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(0,0,0,0.6);
-            color: white;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            z-index: 5;
-            cursor: pointer;
-        }
-        .slider-arrow.prev { left: 8px; }
-        .slider-arrow.next { right: 8px; }
-
-        .float-add-btn {
-            position: fixed;
-            bottom: 85px;
-            right: calc(50% - 220px);
-            background: #1abc9c;
-            color: white;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            font-size: 1.5rem;
-            border: none;
-            box-shadow: 0 4px 12px rgba(26, 188, 156, 0.4);
-            z-index: 99;
-            cursor: pointer;
-        }
-        @media (max-width: 480px) {
-            .float-add-btn { right: 20px; }
-        }
-
-        /* Модальные окна */
-        .modal {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        .modal-content {
-            background: var(--bg-card);
-            width: 100%;
-            max-width: 400px;
-            border-radius: 12px;
-            padding: 1.5rem;
-            position: relative;
-            box-sizing: border-box;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .close-modal {
-            position: absolute; right: 15px; top: 15px;
-            background: transparent; border: none; color: var(--text-muted);
-            font-size: 1.5rem; cursor: pointer;
-        }
-
-        .preview-thumbnails { display: flex; gap: 8px; margin-top: 0.8rem; overflow-x: auto; }
-        .thumb-wrapper { position: relative; width: 70px; height: 70px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
-        .thumb-wrapper img { width: 100%; height: 100%; object-fit: cover; }
-        .thumb-remove { position: absolute; top: 2px; right: 2px; background: rgba(239,68,68,0.8); color: white; border: none; width: 18px; height: 18px; border-radius: 50%; font-size: 0.65rem; display: flex; align-items: center; justify-content: center; }
-
-        .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
-        .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
-        .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
-
-        .info-card { background: var(--bg-card); border-radius: 12px; padding: 2rem; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-
-        .mobile-nav {
-            background: var(--bg-card);
-            display: flex;
-            justify-content: space-around;
-            padding: 0.6rem 0;
-            border-top: 1px solid rgba(255,255,255,0.05);
-            flex-shrink: 0;
-            z-index: 100;
-        }
-        .mobile-nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); font-size: 0.75rem; text-decoration: none; cursor: pointer; gap: 4px; }
-        .mobile-nav-item.active { color: var(--primary); }
-        .mobile-nav-item i { font-size: 1.2rem; }
-
-        /* Элементы корзины */
-        .cart-item { display: flex; align-items: center; gap: 10px; background: #1a2333; padding: 8px; border-radius: 8px; margin-bottom: 8px; }
-        .cart-item-info { flex-grow: 1; text-align: left; }
-        .cart-item-info h4 { margin: 0 0 4px 0; font-size: 0.9rem; color: #fff; }
-        .remove-item-btn { background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 1rem; }
-    </style>
-</head>
-<body>
-
-    <div class="mobile-container">
-        
-        <header>
-            <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
-            <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
-                <div class="admin-badge"><i class="fa-solid fa-user-shield"></i> Admin</div>
-                <i class="fa-solid fa-right-from-bracket" onclick="logoutAdmin()" style="color: var(--danger); cursor: pointer;"></i>
+    return `
+        <div class="product-slider" id="slider-${productId}" data-current="0" data-max="${imgs.length}">
+            <div class="slider-track" id="track-${productId}">
+                ${slidesHtml}
             </div>
-            <button class="cart-icon-btn" onclick="openCartModal()">
-                <i class="fa-solid fa-basket-shopping"></i>
-                <span class="cart-count" id="cart-count">0</span>
+            ${arrowsHtml}
+        </div>
+    `;
+}
+
+function moveSlider(productId, direction, event) {
+    if (event) event.stopPropagation();
+    const slider = document.getElementById(`slider-${productId}`);
+    const track = document.getElementById(`track-${productId}`);
+    if (!slider || !track) return;
+
+    let current = parseInt(slider.getAttribute('data-current'));
+    const max = parseInt(slider.getAttribute('data-max'));
+
+    current += direction;
+    if (current < 0) current = max - 1;
+    if (current >= max) current = 0;
+
+    slider.setAttribute('data-current', current);
+    track.style.transform = `translateX(-${current * 100}%)`;
+}
+
+function renderProducts() {
+    const container = document.getElementById('products-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const filtered = currentCategory === 'all' ? products : products.filter(p => p.category === currentCategory);
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0; grid-column: span 3; font-size:0.8rem;">Товаров пока нет.</p>';
+        return;
+    }
+
+    filtered.forEach((prod) => {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
+
+        const deleteButtonHtml = isAdminMode ? `
+            <button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)">
+                <i class="fa-solid fa-trash"></i>
+            </button>` : '';
+        
+        const imagesList = prod.images ? Object.values(prod.images) : [];
+        const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
+
+        card.innerHTML = `
+            <img src="${coverPhoto}" class="product-main-photo" loading="lazy">
+            <div class="product-info">
+                <div>
+                    <div class="product-price">${Number(prod.price)} BYN</div>
+                    <div class="product-title">${prod.title}</div>
+                </div>
+                <div class="card-actions-row">
+                    <button class="card-btn" onclick="addToCart(${prod.id}, event)">
+                        <i class="fa-solid fa-cart-plus"></i>
+                    </button>
+                    ${deleteButtonHtml}
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function openDetailModal(id, event) {
+    if (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn')) return;
+    const prod = products.find(p => p.id === id);
+    if (!prod) return;
+
+    const content = document.getElementById('modal-detail-content');
+    const imagesList = prod.images ? Object.values(prod.images) : [];
+    const modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
+
+    content.innerHTML = `
+        <div style="position:relative;">
+            ${modalSliderHtml}
+        </div>
+        <div style="padding: 1.2rem;">
+            <h2 style="font-size: 1.4rem; margin-bottom:0.2rem; color:#fff;">${prod.title}</h2>
+            <p style="color: #1abc9c; font-size:0.85rem; margin-bottom: 1rem;">Категория: ${prod.category}</p>
+            <div class="modal-price" style="font-size:1.6rem; color:var(--primary); font-weight:800; margin-bottom:1.2rem;">${Number(prod.price).toLocaleString()} BYN</div>
+            <h3 style="margin-bottom: 0.4rem; font-size: 1rem; color:#fff;">Описание:</h3>
+            <p style="color: var(--text-muted); line-height: 1.5; font-size:0.9rem;">${prod.desc}</p>
+            <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem;" onclick="addToCart(${prod.id}, null); closeModal('product-detail-modal');">
+                <i class="fa-solid fa-cart-plus"></i> Добавить в корзину
             </button>
-        </header>
-
-        <div class="sticky-categories" id="categories-wrapper">
-            <div class="categories-bar" id="categories-list"></div>
         </div>
+    `;
+    document.getElementById('product-detail-modal').style.display = 'flex';
+}
 
-        <main>
-            <section id="shop-section" class="section active">
-                <div class="products-grid" id="products-container"></div>
-            </section>
+function switchTab(tabName) {
+    document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
+    const activeNav = document.getElementById(`nav-${tabName}`);
+    if (activeNav) activeNav.classList.add('active');
+    
+    document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+    const activeSection = document.getElementById(`${tabName}-section`);
+    if (activeSection) activeSection.style.display = 'block';
 
-            <section id="address-section" class="section" style="display: none; padding: 10px;">
-                <div class="info-card">
-                    <i class="fa-solid fa-map-location-dot" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
-                    <h2>Наш адрес</h2>
-                    <p>Республика Беларусь, г. Минск, пр. Независимости-113</p>
-                    <p style="color: var(--primary); font-weight: bold; margin-top: 0.5rem;"><i class="fa-solid fa-train-subway"></i> ст.м. Московская</p>
-                    <p style="font-size: 0.85rem; margin-top: 1rem; color: var(--text-muted);">Режим работы: Ежедневно с 10:00 до 21:00</p>
+    const categoriesWrapper = document.getElementById('categories-wrapper');
+    if (categoriesWrapper) {
+        categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
+    }
+}
+
+function renderCategories() {
+    const baseCategories = ['all'];
+    products.forEach(p => {
+        if (p.category && !baseCategories.includes(p.category)) {
+            baseCategories.push(p.category);
+        }
+    });
+    const container = document.getElementById('categories-list');
+    if (!container) return;
+    container.innerHTML = baseCategories.map(cat => {
+        const name = cat === 'all' ? 'Все' : cat;
+        return `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${name}</div>`;
+    }).join('');
+}
+
+function changeCategory(category) {
+    currentCategory = category;
+    renderCategories();
+    renderProducts();
+}
+
+function addToCart(id, event) {
+    if(event) event.stopPropagation();
+    const prod = products.find(p => p.id === id);
+    if (!prod) return;
+
+    cart.push(prod);
+    localStorage.setItem('monetka_cart', JSON.stringify(cart));
+    updateCartUI();
+}
+
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    localStorage.setItem('monetka_cart', JSON.stringify(cart));
+    updateCartUI();
+    renderCartItems();
+}
+
+function updateCartUI() {
+    const countElement = document.getElementById('cart-count');
+    if (countElement) countElement.textContent = cart.length;
+}
+
+function openCartModal() {
+    document.getElementById('cart-modal').style.display = 'flex';
+    renderCartItems();
+}
+
+function renderCartItems() {
+    const container = document.getElementById('cart-items-container');
+    const totalElement = document.getElementById('cart-total-price');
+    if (!container) return;
+    
+    if (cart.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 2rem 0;">Корзина пока пуста</p>';
+        totalElement.textContent = '0.00 BYN';
+        return;
+    }
+
+    let total = 0;
+    container.innerHTML = cart.map((item, index) => {
+        total += Number(item.price);
+        const imagesList = item.images ? Object.values(item.images) : [];
+        const itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
+        return `
+            <div class="cart-item">
+                <img src="${itemPhoto}" style="width:50px; height:50px; object-fit:cover; border-radius:6px;">
+                <div class="cart-item-info">
+                    <h4>${item.title}</h4>
+                    <span style="color: var(--primary); font-weight: bold;">${Number(item.price).toLocaleString()} BYN</span>
                 </div>
-            </section>
-
-            <section id="contacts-section" class="section" style="display: none; padding: 10px;">
-                <div class="info-card">
-                    <i class="fa-solid fa-headset" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
-                    <h2>Свяжитесь с нами</h2>
-                    <p style="margin: 0.8rem 0; font-size: 1.1rem;">Телефон: <a href="tel:+375296642707" style="color: var(--primary); text-decoration: none; font-weight: bold;">+375(29)6642707</a></p>
-                    <p style="margin: 0.5rem 0;">Email: support@monetka-market.by</p>
-                    <p style="margin: 0.5rem 0;">Телеграм: @monetka_support</p>
-                </div>
-            </section>
-        </main>
-
-        <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
-            <i class="fa-solid fa-plus"></i>
-        </button>
-
-        <nav class="mobile-nav">
-            <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
-                <i class="fa-solid fa-store"></i><span>Магазин</span>
+                <button class="remove-item-btn" onclick="removeFromCart(${index})"><i class="fa-solid fa-trash-can"></i></button>
             </div>
-            <div onclick="switchTab('address')" id="nav-address" class="mobile-nav-item">
-                <i class="fa-solid fa-location-dot"></i><span>Адрес</span>
-            </div>
-            <div onclick="switchTab('contacts')" id="nav-contacts" class="mobile-nav-item">
-                <i class="fa-solid fa-phone"></i><span>Контакты</span>
-            </div>
-        </nav>
+        `;
+    }).join('');
 
-    </div>
+    totalElement.textContent = `${total.toLocaleString()} BYN`;
+}
 
-    <div class="modal" id="admin-modal" style="display: none;">
-        <div class="modal-content">
-            <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
-            <h3 style="margin-bottom: 1.2rem;"><i class="fa-solid fa-box-open"></i> Добавить товар</h3>
-            
-            <div class="admin-form-group">
-                <label>Название товара:</label>
-                <input type="text" id="admin-title" class="admin-input" placeholder="Например: Худи">
-            </div>
-            <div class="admin-form-group">
-                <label>Цена (в BYN):</label>
-                <input type="number" id="admin-price" class="admin-input" placeholder="Например: 75">
-            </div>
-            <div class="admin-form-group">
-                <label>Категория:</label>
-                <select id="admin-category" class="admin-select">
-                    <option value="Электроника">Электроника</option>
-                    <option value="Одежда">Одежда</option>
-                    <option value="Дом">Дом</option>
-                </select>
-            </div>
-            
-            <div class="admin-form-group">
-                <label>Фото товара (Первое фото станет ОБЛОЖКОЙ):</label>
-                <div style="position: relative; overflow: hidden;">
-                    <div class="file-input-btn">
-                        <i class="fa-solid fa-camera"></i> Выбрать файлы
-                    </div>
-                    <input type="file" id="admin-file" accept="image/*" multiple onchange="handleMultipleFiles(event)" style="position: absolute; left: 0; top: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer;">
-                </div>
-                <div class="preview-thumbnails" id="thumb-container"></div>
-            </div>
-
-            <div class="admin-form-group">
-                <label>Описание:</label>
-                <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
-            </div>
-            
-            <button class="card-btn" style="margin-top: 0.5rem; padding: 12px; font-size: 0.9rem;" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
-        </div>
-    </div>
-
-    <div class="modal" id="product-detail-modal" style="display: none;">
-        <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
-            <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
-            <div id="modal-detail-content"></div>
-        </div>
-    </div>
-
-    <div class="modal" id="cart-modal" style="display: none;">
-        <div class="modal-content">
-            <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
-            <h3 style="margin-bottom: 1.5rem;"><i class="fa-solid fa-basket-shopping"></i> Ваша корзина</h3>
-            <div id="cart-items-container"></div>
-            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <h4>Итого:</h4>
-                <h3 id="cart-total-price" style="color: var(--primary);">0.00 BYN</h3>
-            </div>
-            <button class="card-btn" style="margin-top: 1rem; padding: 12px;" onclick="alert('Заказ успешно оформлен!')">Оформить заказ</button>
-        </div>
-    </div>
-
-    <script src="js/script.js"></script>
-</body>
-</html>
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
