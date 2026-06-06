@@ -252,7 +252,6 @@
             box-sizing: border-box;
         }
 
-        /* Бейдж уценки на карточке */
         .markdown-badge {
             position: absolute;
             top: 4px;
@@ -355,7 +354,7 @@
         .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
         .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
         
-        /* Стили для тумблера уценки */
+        /* Стили тумблера уценки */
         .toggle-container {
             display: flex;
             align-items: center;
@@ -475,17 +474,17 @@
             <h3 style="margin-bottom: 1.2rem;"><i class="fa-solid fa-box-open"></i> Добавить товар</h3>
             
             <div class="admin-form-group">
-                <label>Название товара:</label>
+                <label>Название товара *:</label>
                 <input type="text" id="admin-title" class="admin-input" placeholder="Например: Худи">
             </div>
             <div class="admin-form-group">
-                <label>Цена (в BYN):</label>
+                <label>Цена * (в BYN):</label>
                 <input type="number" id="admin-price" class="admin-input" placeholder="Например: 50">
             </div>
 
             <div class="admin-form-group">
                 <div class="toggle-container">
-                    <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Авто-уценка (15/30 дней)</span>
+                    <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Применять авто-уценку</span>
                     <label class="switch">
                         <input type="checkbox" id="admin-allow-markdown" checked>
                         <span class="slider-toggle"></span>
@@ -503,7 +502,7 @@
             </div>
             
             <div class="admin-form-group">
-                <label>Фото товара (без ограничений по весу):</label>
+                <label>Фото товара (без ограничений по MB):</label>
                 <div style="position: relative; overflow: hidden;">
                     <div class="file-input-btn">
                         <i class="fa-solid fa-camera"></i> Выбрать файлы
