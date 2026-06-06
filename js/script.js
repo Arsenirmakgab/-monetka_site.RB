@@ -1,10 +1,13 @@
+// Подключение к созданной базе данных Firebase Realtime Database
 const firebaseConfig = {
     databaseURL: "https://monetka-market-default-rtdb.europe-west1.firebasedatabase.app/"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// РЕЖИМ ТЕСТИРОВАНИЯ: если true, то уценка происходит через 1 и 2 минуты вместо 15 и 30 дней.
+// РЕЖИМ ТЕСТИРОВАНИЯ УЦЕНКИ
+// false - уценка сработает через 15 и 30 дней.
+// true  - уценка сработает через 1 и 2 минуты (для проверки кода).
 const TEST_MODE = false; 
 
 let products = [];
@@ -31,6 +34,7 @@ function applyAdminUI() {
     }
 }
 
+// Слушаем изменения в Firebase — сайт сам обновится на всех устройствах при добавлении или удалении карточки
 function listenToCloudProducts() {
     db.ref('products').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -43,7 +47,7 @@ function listenToCloudProducts() {
         renderCategories();
         renderProducts();
     }, (error) => {
-        console.log("Работа на локальном бекапе:", error);
+        console.log("Ошибка сети, работа на локальном бекапе:", error);
         const localData = localStorage.getItem('monetka_products_backup');
         if (localData) {
             products = JSON.parse(localData);
@@ -56,10 +60,10 @@ function listenToCloudProducts() {
 function handleLogoClick() {
     switchTab('shop');
     if (!isAdminMode) {
-        let pass = prompt("Введите пароль:");
+        let pass = prompt("Введите пароль администратора:");
         if (pass === "13579") {
             localStorage.setItem('monetka_admin', 'true');
-            alert("Вход выполнен!");
+            alert("Вход выполнен успешно!");
             location.reload(); 
         } else if (pass !== null) {
             alert("Неверный пароль!");
@@ -68,17 +72,17 @@ function handleLogoClick() {
 }
 
 function logoutAdmin() {
-    if (confirm("Выйти?")) {
+    if (confirm("Выйти из режима администратора?")) {
         localStorage.removeItem('monetka_admin');
         location.reload();
     }
 }
 
-// УМНАЯ ФУНКЦИЯ РАСЧЕТА УЦЕНКИ С УЧЕТОМ НАСТРОЙКИ АДМИНА
+// АВТОМАТИЧЕСКИЙ РАСЧЕТ ТЕКУЩЕЙ ЦЕНЫ С УЧЕТОМ СРОКА И ТУМБЛЕРА АДМИНА
 function calculateCurrentPrice(prod) {
     const basePrice = Number(prod.price);
     
-    // Если уценка отключена админом для этого товара или нет таймстемпа
+    // Если уценка принудительно отключена админом при создании товара
     if (prod.allowMarkdown === false || !prod.timestamp) {
         return { current: basePrice, oldPrices: [], badge: null };
     }
@@ -86,12 +90,12 @@ function calculateCurrentPrice(prod) {
     const now = Date.now();
     const diffMs = now - prod.timestamp;
     
-    // Переводим временные интервалы (минуты для теста, дни для продакшена)
+    // Установка интервалов в зависимости от режима (Минуты для теста / Дни для продакшена)
     const interval1 = TEST_MODE ? (60 * 1000) : (15 * 24 * 60 * 60 * 1000); 
     const interval2 = TEST_MODE ? (120 * 1000) : (30 * 24 * 60 * 60 * 1000);
 
     if (diffMs >= interval2) {
-        // Вторая уценка: -20%, а затем еще -30%
+        // Прошло 30 дней: первая уценка (-20%), затем от полученной цены еще -30%
         const price1 = Math.round(basePrice * 0.8 * 100) / 100;
         const price2 = Math.round(price1 * 0.7 * 100) / 100;
         return {
@@ -100,7 +104,7 @@ function calculateCurrentPrice(prod) {
             badge: '-30%'
         };
     } else if (diffMs >= interval1) {
-        // Первая уценка: -20%
+        // Прошло 15 дней: уценка -20%
         const price1 = Math.round(basePrice * 0.8 * 100) / 100;
         return {
             current: price1,
@@ -112,6 +116,7 @@ function calculateCurrentPrice(prod) {
     return { current: basePrice, oldPrices: [], badge: null };
 }
 
+// ОПТИМИЗАЦИЯ И СЖАТИЕ ФОТО (Переваривает картинки любого веса, хоть по 10 МБ)
 function compressImage(file, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -122,7 +127,7 @@ function compressImage(file, callback) {
             const canvas = document.createElement('canvas');
             let width = img.width;
             let height = img.height;
-            const max_size = 800;
+            const max_size = 800; // Ограничиваем максимальную ширину/высоту до 800px
 
             if (width > height) {
                 if (width > max_size) { height *= max_size / width; width = max_size; }
@@ -134,6 +139,8 @@ function compressImage(file, callback) {
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
+            
+            // Конвертируем в компактный JPEG с качеством 70%
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
             callback(compressedBase64);
         };
@@ -174,46 +181,70 @@ function removeThumbnail(index) {
 function openAdminModal() {
     uploadedImagesBase64 = [];
     renderThumbnails();
-    document.getElementById('admin-modal').style.display = 'flex';
+    const modal = document.getElementById('admin-modal');
+    if(modal) modal.style.display = 'flex';
 }
 
+// ЗАЩИЩЕННАЯ ФУНКЦИЯ ОТПРАВКИ КАРТОЧКИ В ОБЛАКО FIREBASE
 function addNewProductFromSite() {
-    const title = document.getElementById('admin-title').value.trim();
-    const price = document.getElementById('admin-price').value;
-    const category = document.getElementById('admin-category').value;
-    const desc = document.getElementById('admin-desc').value.trim();
-    const allowMarkdown = document.getElementById('admin-allow-markdown').checked; // Считываем тумблер уценки
+    try {
+        const titleEl = document.getElementById('admin-title');
+        const priceEl = document.getElementById('admin-price');
+        const categoryEl = document.getElementById('admin-category');
+        const descEl = document.getElementById('admin-desc');
+        const markdownEl = document.getElementById('admin-allow-markdown');
 
-    if (!title || !price) {
-        alert("Заполните поля!");
-        return;
+        if (!titleEl || !priceEl) {
+            alert("Критическая ошибка: Элементы формы не найдены в коде HTML!");
+            return;
+        }
+
+        const title = titleEl.value.trim();
+        const price = priceEl.value;
+        const category = categoryEl ? categoryEl.value : "Общее";
+        const desc = descEl ? descEl.value.trim() : "Описание отсутствует.";
+        const allowMarkdown = markdownEl ? markdownEl.checked : true;
+
+        if (!title || !price) {
+            alert("Пожалуйста, заполните обязательные поля (Название и Цена)!");
+            return;
+        }
+
+        if (typeof firebase === 'undefined') {
+            alert("Ошибка: Библиотеки Firebase не загружены в index.html!");
+            return;
+        }
+
+        const productId = Date.now();
+        const newProduct = {
+            id: productId, 
+            timestamp: Date.now(), // Точная метка времени для уценки
+            title: title,
+            price: parseFloat(price),
+            category: category,
+            desc: desc,
+            allowMarkdown: allowMarkdown, 
+            images: [...uploadedImagesBase64] 
+        };
+
+        db.ref('products/' + productId).set(newProduct)
+        .then(() => {
+            titleEl.value = '';
+            priceEl.value = '';
+            if(descEl) descEl.value = '';
+            uploadedImagesBase64 = [];
+            closeModal('admin-modal');
+            alert("✅ Товар успешно сохранен в облачную базу данных!");
+        })
+        .catch((err) => {
+            alert("Ошибка сохранения. Firebase отклонил запрос.");
+            console.error(err);
+        });
+
+    } catch (error) {
+        alert("Произошла ошибка в работе скрипта: " + error.message);
+        console.error(error);
     }
-
-    const productId = Date.now();
-    const newProduct = {
-        id: productId, 
-        timestamp: Date.now(), // Точка старта для расчета уценки
-        title: title,
-        price: parseFloat(price),
-        category: category,
-        desc: desc || "Описание отсутствует.",
-        allowMarkdown: allowMarkdown, // Сохраняем флаг в базу
-        images: [...uploadedImagesBase64] 
-    };
-
-    db.ref('products/' + productId).set(newProduct)
-    .then(() => {
-        document.getElementById('admin-title').value = '';
-        document.getElementById('admin-price').value = '';
-        document.getElementById('admin-desc').value = '';
-        uploadedImagesBase64 = [];
-        closeModal('admin-modal');
-        alert("✅ Товар успешно сохранен в облачную базу данных!");
-    })
-    .catch((err) => {
-        alert("Ошибка отправки в облако.");
-        console.error(err);
-    });
 }
 
 function deleteProduct(id, event) {
@@ -267,7 +298,7 @@ function renderProducts() {
         card.className = 'product-card';
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
-        // Считаем уценку
+        // Вычисляем текущую цену с уценкой
         const priceInfo = calculateCurrentPrice(prod);
 
         const deleteButtonHtml = isAdminMode ? `
@@ -278,7 +309,7 @@ function renderProducts() {
         const imagesList = prod.images ? Object.values(prod.images) : [];
         const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
 
-        // Рендерим зачеркнутые старые цены, если они есть
+        // Формируем блок зачеркнутых цен
         let oldPricesHtml = '';
         let isDiscountedClass = '';
         if (priceInfo.oldPrices.length > 0) {
@@ -286,7 +317,6 @@ function renderProducts() {
             oldPricesHtml = `<div class="old-prices-box">${priceInfo.oldPrices.map(p => p + ' BYN').join(' → ')}</div>`;
         }
 
-        // Рендерим значок уценки
         let badgeHtml = priceInfo.badge ? `<div class="markdown-badge">${priceInfo.badge}</div>` : '';
 
         card.innerHTML = `
@@ -370,13 +400,12 @@ function changeCategory(category) {
     renderProducts();
 }
 
-// Добавление в корзину с учетом текущей (уцененной) цены товара
 function addToCartWithPrice(id, currentPrice, event) {
     if(event) event.stopPropagation();
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
-    // Клонируем товар, чтобы зафиксировать ту цену, по которой он покупается
+    // Фиксируем уцененную цену на момент добавления в корзину
     const cartItem = {
         ...prod,
         finalPrice: currentPrice 
