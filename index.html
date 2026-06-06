@@ -17,6 +17,7 @@
             --text-main: #ffffff;
             --text-muted: #8fa0ba;
             --danger: #ef4444;
+            --discount-color: #2ecc71;
         }
 
         body {
@@ -150,12 +151,12 @@
             cursor: pointer;
             box-sizing: border-box;
             height: calc((100vh - 200px) / 3); 
-            min-height: 160px;
+            min-height: 175px;
         }
 
         .product-main-photo {
             width: 100%;
-            height: 55%;
+            height: 52%;
             object-fit: cover;
             background: #151d2a;
             display: block;
@@ -167,15 +168,34 @@
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            height: 45%; 
+            height: 48%; 
             box-sizing: border-box;
         }
         
+        .price-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
         .product-price {
             font-size: 0.8rem;
             font-weight: 800;
             color: var(--primary);
             white-space: nowrap;
+        }
+
+        .product-price.discounted {
+            color: var(--discount-color);
+        }
+
+        .old-prices-box {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-decoration: line-through;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .product-title {
@@ -232,6 +252,20 @@
             box-sizing: border-box;
         }
 
+        /* Бейдж уценки на карточке */
+        .markdown-badge {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.55rem;
+            font-weight: bold;
+            padding: 2px 4px;
+            border-radius: 4px;
+            z-index: 2;
+        }
+
         .product-slider {
             position: relative;
             width: 100%;
@@ -285,7 +319,6 @@
             .float-add-btn { right: 20px; }
         }
 
-        /* Модальные окна */
         .modal {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -321,8 +354,36 @@
 
         .admin-form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.3rem; text-align: left; }
         .admin-input, .admin-select { width: 100%; padding: 0.75rem; background: #273549; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 0.95rem; box-sizing: border-box; }
-        .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
+        
+        /* Стили для тумблера уценки */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #273549;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-toggle {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc; transition: .3s; border-radius: 24px;
+        }
+        .slider-toggle:before {
+            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+            background-color: white; transition: .3s; border-radius: 50%;
+        }
+        input:checked + .slider-toggle { background-color: #1abc9c; }
+        input:checked + .slider-toggle:before { transform: translateX(20px); }
 
+        .file-input-btn { border: 2px dashed #1abc9c; color: #fff; background: transparent; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: bold; cursor: pointer; text-align: center; }
         .info-card { background: var(--bg-card); border-radius: 12px; padding: 2rem; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
 
         .mobile-nav {
@@ -338,7 +399,6 @@
         .mobile-nav-item.active { color: var(--primary); }
         .mobile-nav-item i { font-size: 1.2rem; }
 
-        /* Элементы корзины */
         .cart-item { display: flex; align-items: center; gap: 10px; background: #1a2333; padding: 8px; border-radius: 8px; margin-bottom: 8px; }
         .cart-item-info { flex-grow: 1; text-align: left; }
         .cart-item-info h4 { margin: 0 0 4px 0; font-size: 0.9rem; color: #fff; }
@@ -420,8 +480,19 @@
             </div>
             <div class="admin-form-group">
                 <label>Цена (в BYN):</label>
-                <input type="number" id="admin-price" class="admin-input" placeholder="Например: 75">
+                <input type="number" id="admin-price" class="admin-input" placeholder="Например: 50">
             </div>
+
+            <div class="admin-form-group">
+                <div class="toggle-container">
+                    <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Авто-уценка (15/30 дней)</span>
+                    <label class="switch">
+                        <input type="checkbox" id="admin-allow-markdown" checked>
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </div>
+
             <div class="admin-form-group">
                 <label>Категория:</label>
                 <select id="admin-category" class="admin-select">
@@ -432,7 +503,7 @@
             </div>
             
             <div class="admin-form-group">
-                <label>Фото товара (Первое фото станет ОБЛОЖКОЙ):</label>
+                <label>Фото товара (без ограничений по весу):</label>
                 <div style="position: relative; overflow: hidden;">
                     <div class="file-input-btn">
                         <i class="fa-solid fa-camera"></i> Выбрать файлы
