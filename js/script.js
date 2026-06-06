@@ -1,9 +1,11 @@
-// Инициализируем созданную базу данных Firebase Realtime Database
 const firebaseConfig = {
     databaseURL: "https://monetka-market-default-rtdb.europe-west1.firebasedatabase.app/"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+
+// РЕЖИМ ТЕСТИРОВАНИЯ: если true, то уценка происходит через 1 и 2 минуты вместо 15 и 30 дней.
+const TEST_MODE = false; 
 
 let products = [];
 let cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
@@ -14,7 +16,7 @@ let uploadedImagesBase64 = [];
 document.addEventListener('DOMContentLoaded', () => {
     applyAdminUI();
     updateCartUI();
-    listenToCloudProducts(); // Слушаем базу в реальном времени
+    listenToCloudProducts();
 });
 
 function applyAdminUI() {
@@ -29,7 +31,6 @@ function applyAdminUI() {
     }
 }
 
-// УМНАЯ СИНХРОНИЗАЦИЯ: Firebase сам обновляет экран при любых изменениях на сервере
 function listenToCloudProducts() {
     db.ref('products').on('value', (snapshot) => {
         const data = snapshot.val();
@@ -42,7 +43,7 @@ function listenToCloudProducts() {
         renderCategories();
         renderProducts();
     }, (error) => {
-        console.log("Ошибка Firebase, работаем на локальном бекапе:", error);
+        console.log("Работа на локальном бекапе:", error);
         const localData = localStorage.getItem('monetka_products_backup');
         if (localData) {
             products = JSON.parse(localData);
@@ -73,7 +74,44 @@ function logoutAdmin() {
     }
 }
 
-// ФУНКЦИЯ УМНОГО СЖАТИЯ КАРТИНКИ (Принимает файлы хоть по 10-20 МБ)
+// УМНАЯ ФУНКЦИЯ РАСЧЕТА УЦЕНКИ С УЧЕТОМ НАСТРОЙКИ АДМИНА
+function calculateCurrentPrice(prod) {
+    const basePrice = Number(prod.price);
+    
+    // Если уценка отключена админом для этого товара или нет таймстемпа
+    if (prod.allowMarkdown === false || !prod.timestamp) {
+        return { current: basePrice, oldPrices: [], badge: null };
+    }
+
+    const now = Date.now();
+    const diffMs = now - prod.timestamp;
+    
+    // Переводим временные интервалы (минуты для теста, дни для продакшена)
+    const interval1 = TEST_MODE ? (60 * 1000) : (15 * 24 * 60 * 60 * 1000); 
+    const interval2 = TEST_MODE ? (120 * 1000) : (30 * 24 * 60 * 60 * 1000);
+
+    if (diffMs >= interval2) {
+        // Вторая уценка: -20%, а затем еще -30%
+        const price1 = Math.round(basePrice * 0.8 * 100) / 100;
+        const price2 = Math.round(price1 * 0.7 * 100) / 100;
+        return {
+            current: price2,
+            oldPrices: [basePrice, price1],
+            badge: '-30%'
+        };
+    } else if (diffMs >= interval1) {
+        // Первая уценка: -20%
+        const price1 = Math.round(basePrice * 0.8 * 100) / 100;
+        return {
+            current: price1,
+            oldPrices: [basePrice],
+            badge: '-20%'
+        };
+    }
+
+    return { current: basePrice, oldPrices: [], badge: null };
+}
+
 function compressImage(file, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -82,31 +120,20 @@ function compressImage(file, callback) {
         img.src = event.target.result;
         img.onload = function () {
             const canvas = document.createElement('canvas');
-            
-            // Задаем оптимальный размер для мобильной карточки товара
             let width = img.width;
             let height = img.height;
-            const max_size = 800; // Сжимаем до 800px по большей стороне
+            const max_size = 800;
 
             if (width > height) {
-                if (width > max_size) {
-                    height *= max_size / width;
-                    width = max_size;
-                }
+                if (width > max_size) { height *= max_size / width; width = max_size; }
             } else {
-                if (height > max_size) {
-                    width *= max_size / height;
-                    height = max_size;
-                }
+                if (height > max_size) { width *= max_size / height; height = max_size; }
             }
 
             canvas.width = width;
             canvas.height = height;
-            
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, width, height);
-            
-            // Превращаем в JPEG с качеством 70% (визуально разницы нет, но вес падает в 50 раз)
             const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
             callback(compressedBase64);
         };
@@ -119,9 +146,7 @@ function handleMultipleFiles(event) {
         alert("Можно загрузить максимум 3 фото!");
         return;
     }
-
     files.forEach(file => {
-        // Ограничений на входной размер больше нет! compressImage переварит всё
         compressImage(file, function(compressedBase64) {
             uploadedImagesBase64.push(compressedBase64);
             renderThumbnails();
@@ -157,6 +182,7 @@ function addNewProductFromSite() {
     const price = document.getElementById('admin-price').value;
     const category = document.getElementById('admin-category').value;
     const desc = document.getElementById('admin-desc').value.trim();
+    const allowMarkdown = document.getElementById('admin-allow-markdown').checked; // Считываем тумблер уценки
 
     if (!title || !price) {
         alert("Заполните поля!");
@@ -166,10 +192,12 @@ function addNewProductFromSite() {
     const productId = Date.now();
     const newProduct = {
         id: productId, 
+        timestamp: Date.now(), // Точка старта для расчета уценки
         title: title,
         price: parseFloat(price),
         category: category,
         desc: desc || "Описание отсутствует.",
+        allowMarkdown: allowMarkdown, // Сохраняем флаг в базу
         images: [...uploadedImagesBase64] 
     };
 
@@ -180,31 +208,24 @@ function addNewProductFromSite() {
         document.getElementById('admin-desc').value = '';
         uploadedImagesBase64 = [];
         closeModal('admin-modal');
-        alert("✅ Товар успешно опубликован на всех устройствах!");
+        alert("✅ Товар успешно сохранен в облачную базу данных!");
     })
     .catch((err) => {
-        alert("Ошибка отправки в облако. Попробуйте еще раз.");
+        alert("Ошибка отправки в облако.");
         console.error(err);
     });
 }
 
 function deleteProduct(id, event) {
     event.stopPropagation(); 
-    if (confirm("Удалить этот товар? Он исчезнет со всех устройств.")) {
-        db.ref('products/' + id).remove()
-        .then(() => {
-            console.log("Товар удален из Firebase");
-        })
-        .catch((err) => {
-            alert("Не удалось удалить товар из облака");
-        });
+    if (confirm("Удалить этот товар? Он исчезнет со всех устройств навсегда.")) {
+        db.ref('products/' + id).remove();
     }
 }
 
 function generateSliderHtml(productId, imagesArray) {
     const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
     let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
-    
     let arrowsHtml = '';
     if (imgs.length > 1) {
         arrowsHtml = `
@@ -212,15 +233,7 @@ function generateSliderHtml(productId, imagesArray) {
             <button class="slider-arrow next" onclick="moveSlider(${productId}, 1, event)">▶</button>
         `;
     }
-
-    return `
-        <div class="product-slider" id="slider-${productId}" data-current="0" data-max="${imgs.length}">
-            <div class="slider-track" id="track-${productId}">
-                ${slidesHtml}
-            </div>
-            ${arrowsHtml}
-        </div>
-    `;
+    return `<div class="product-slider" id="slider-${productId}" data-current="0" data-max="${imgs.length}"><div class="slider-track" id="track-${productId}">${slidesHtml}</div>${arrowsHtml}</div>`;
 }
 
 function moveSlider(productId, direction, event) {
@@ -228,14 +241,11 @@ function moveSlider(productId, direction, event) {
     const slider = document.getElementById(`slider-${productId}`);
     const track = document.getElementById(`track-${productId}`);
     if (!slider || !track) return;
-
     let current = parseInt(slider.getAttribute('data-current'));
     const max = parseInt(slider.getAttribute('data-max'));
-
     current += direction;
     if (current < 0) current = max - 1;
     if (current >= max) current = 0;
-
     slider.setAttribute('data-current', current);
     track.style.transform = `translateX(-${current * 100}%)`;
 }
@@ -257,6 +267,9 @@ function renderProducts() {
         card.className = 'product-card';
         card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
 
+        // Считаем уценку
+        const priceInfo = calculateCurrentPrice(prod);
+
         const deleteButtonHtml = isAdminMode ? `
             <button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)">
                 <i class="fa-solid fa-trash"></i>
@@ -265,15 +278,28 @@ function renderProducts() {
         const imagesList = prod.images ? Object.values(prod.images) : [];
         const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
 
+        // Рендерим зачеркнутые старые цены, если они есть
+        let oldPricesHtml = '';
+        let isDiscountedClass = '';
+        if (priceInfo.oldPrices.length > 0) {
+            isDiscountedClass = 'discounted';
+            oldPricesHtml = `<div class="old-prices-box">${priceInfo.oldPrices.map(p => p + ' BYN').join(' → ')}</div>`;
+        }
+
+        // Рендерим значок уценки
+        let badgeHtml = priceInfo.badge ? `<div class="markdown-badge">${priceInfo.badge}</div>` : '';
+
         card.innerHTML = `
+            ${badgeHtml}
             <img src="${coverPhoto}" class="product-main-photo" loading="lazy">
             <div class="product-info">
-                <div>
-                    <div class="product-price">${Number(prod.price)} BYN</div>
-                    <div class="product-title">${prod.title}</div>
+                <div class="price-container">
+                    ${oldPricesHtml}
+                    <div class="product-price ${isDiscountedClass}">${priceInfo.current} BYN</div>
                 </div>
+                <div class="product-title">${prod.title}</div>
                 <div class="card-actions-row">
-                    <button class="card-btn" onclick="addToCart(${prod.id}, event)">
+                    <button class="card-btn" onclick="addToCartWithPrice(${prod.id}, ${priceInfo.current}, event)">
                         <i class="fa-solid fa-cart-plus"></i>
                     </button>
                     ${deleteButtonHtml}
@@ -289,21 +315,28 @@ function openDetailModal(id, event) {
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
+    const priceInfo = calculateCurrentPrice(prod);
     const content = document.getElementById('modal-detail-content');
     const imagesList = prod.images ? Object.values(prod.images) : [];
     const modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
 
+    let oldPricesHtml = '';
+    if (priceInfo.oldPrices.length > 0) {
+        oldPricesHtml = `<div style="font-size:0.9rem; color:var(--text-muted); text-decoration:line-through; margin-bottom: 2px;">Старая цена: ${priceInfo.oldPrices.map(p => p + ' BYN').join(' → ')}</div>`;
+    }
+
     content.innerHTML = `
-        <div style="position:relative;">
-            ${modalSliderHtml}
-        </div>
+        <div style="position:relative;">${modalSliderHtml}</div>
         <div style="padding: 1.2rem;">
             <h2 style="font-size: 1.4rem; margin-bottom:0.2rem; color:#fff;">${prod.title}</h2>
             <p style="color: #1abc9c; font-size:0.85rem; margin-bottom: 1rem;">Категория: ${prod.category}</p>
-            <div class="modal-price" style="font-size:1.6rem; color:var(--primary); font-weight:800; margin-bottom:1.2rem;">${Number(prod.price).toLocaleString()} BYN</div>
+            <div style="margin-bottom:1.2rem;">
+                ${oldPricesHtml}
+                <div style="font-size:1.6rem; color:${priceInfo.oldPrices.length > 0 ? 'var(--discount-color)' : 'var(--primary)'}; font-weight:800;">${priceInfo.current} BYN</div>
+            </div>
             <h3 style="margin-bottom: 0.4rem; font-size: 1rem; color:#fff;">Описание:</h3>
             <p style="color: var(--text-muted); line-height: 1.5; font-size:0.9rem;">${prod.desc}</p>
-            <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem;" onclick="addToCart(${prod.id}, null); closeModal('product-detail-modal');">
+            <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem;" onclick="addToCartWithPrice(${prod.id}, ${priceInfo.current}, null); closeModal('product-detail-modal');">
                 <i class="fa-solid fa-cart-plus"></i> Добавить в корзину
             </button>
         </div>
@@ -315,30 +348,20 @@ function switchTab(tabName) {
     document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
     const activeNav = document.getElementById(`nav-${tabName}`);
     if (activeNav) activeNav.classList.add('active');
-    
     document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
-    const activeSection = document.getElementById(`${tabName}-section`);
-    if (activeSection) activeSection.style.display = 'block';
-
+    document.getElementById(`${tabName}-section`).style.display = 'block';
     const categoriesWrapper = document.getElementById('categories-wrapper');
-    if (categoriesWrapper) {
-        categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
-    }
+    if (categoriesWrapper) categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
 }
 
 function renderCategories() {
     const baseCategories = ['all'];
     products.forEach(p => {
-        if (p.category && !baseCategories.includes(p.category)) {
-            baseCategories.push(p.category);
-        }
+        if (p.category && !baseCategories.includes(p.category)) baseCategories.push(p.category);
     });
     const container = document.getElementById('categories-list');
     if (!container) return;
-    container.innerHTML = baseCategories.map(cat => {
-        const name = cat === 'all' ? 'Все' : cat;
-        return `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${name}</div>`;
-    }).join('');
+    container.innerHTML = baseCategories.map(cat => `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${cat === 'all' ? 'Все' : cat}</div>`).join('');
 }
 
 function changeCategory(category) {
@@ -347,12 +370,19 @@ function changeCategory(category) {
     renderProducts();
 }
 
-function addToCart(id, event) {
+// Добавление в корзину с учетом текущей (уцененной) цены товара
+function addToCartWithPrice(id, currentPrice, event) {
     if(event) event.stopPropagation();
     const prod = products.find(p => p.id === id);
     if (!prod) return;
 
-    cart.push(prod);
+    // Клонируем товар, чтобы зафиксировать ту цену, по которой он покупается
+    const cartItem = {
+        ...prod,
+        finalPrice: currentPrice 
+    };
+
+    cart.push(cartItem);
     localStorage.setItem('monetka_cart', JSON.stringify(cart));
     updateCartUI();
 }
@@ -387,7 +417,8 @@ function renderCartItems() {
 
     let total = 0;
     container.innerHTML = cart.map((item, index) => {
-        total += Number(item.price);
+        const itemPrice = Number(item.finalPrice || item.price);
+        total += itemPrice;
         const imagesList = item.images ? Object.values(item.images) : [];
         const itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
         return `
@@ -395,7 +426,7 @@ function renderCartItems() {
                 <img src="${itemPhoto}" style="width:50px; height:50px; object-fit:cover; border-radius:6px;">
                 <div class="cart-item-info">
                     <h4>${item.title}</h4>
-                    <span style="color: var(--primary); font-weight: bold;">${Number(item.price).toLocaleString()} BYN</span>
+                    <span style="color: var(--discount-color); font-weight: bold;">${itemPrice.toLocaleString()} BYN</span>
                 </div>
                 <button class="remove-item-btn" onclick="removeFromCart(${index})"><i class="fa-solid fa-trash-can"></i></button>
             </div>
