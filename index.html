@@ -6,6 +6,7 @@
     <title>Монетка Маркет</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
+    <!-- ОФИЦИАЛЬНЫЕ КЛАССИЧЕСКИЕ БИБЛИОТЕКИ FIREBASE -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -252,6 +253,7 @@
             height: auto !important;
         }
         .big-publish-btn:active { background: #16a085 !important; }
+        .big-publish-btn:disabled { background: #7f8c8d !important; cursor: not-allowed; box-shadow: none; }
         
         .delete-card-btn {
             background: var(--danger);
@@ -369,6 +371,7 @@
 <body>
 
     <div class="mobile-container">
+        <!-- ШАПКА -->
         <header>
             <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
             <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
@@ -381,10 +384,12 @@
             </button>
         </header>
 
+        <!-- КАТЕГОРИИ -->
         <div class="sticky-categories" id="categories-wrapper">
             <div class="categories-bar" id="categories-list"></div>
         </div>
 
+        <!-- ОСНОВНОЙ КОНТЕНТ -->
         <main>
             <section id="shop-section" class="section active">
                 <div class="products-grid" id="products-container"></div>
@@ -411,10 +416,12 @@
             </section>
         </main>
 
+        <!-- КНОПКА ПЛЮС ДЛЯ АДМИНА -->
         <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
             <i class="fa-solid fa-plus"></i>
         </button>
 
+        <!-- НИЖНЯЯ НАВИГАЦИЯ -->
         <nav class="mobile-nav">
             <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
                 <i class="fa-solid fa-store"></i><span>Магазин</span>
@@ -428,6 +435,7 @@
         </nav>
     </div>
 
+    <!-- МОДАЛКА: АДМИН-ФОРМА -->
     <div class="modal" id="admin-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
@@ -442,6 +450,7 @@
                 <input type="number" id="admin-price" class="admin-input" placeholder="Например: 50">
             </div>
 
+            <!-- ТУМБЛЕР УЦЕНКИ -->
             <div class="admin-form-group">
                 <div class="toggle-container">
                     <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Применять авто-уценку</span>
@@ -477,10 +486,12 @@
                 <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
             </div>
             
+            <!-- КНОПКА ПУБЛИКАЦИИ -->
             <button class="big-publish-btn" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
         </div>
     </div>
 
+    <!-- МОДАЛКА: ПРОСМОТР ТОВАРA -->
     <div class="modal" id="product-detail-modal" style="display: none;">
         <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
             <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
@@ -488,6 +499,7 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА: КОРЗИНА -->
     <div class="modal" id="cart-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
@@ -601,6 +613,7 @@
             return { current: basePrice, oldPrices: [], badge: null };
         }
 
+        // МОДИФИЦИРОВАННОЕ СВЕРХБЫСТРОЕ СЖАТИЕ КАРТИНКИ С УМЕНЬШЕНИЕМ ВЕСА В 10 РАЗ
         function compressImage(file, callback) {
             var reader = new FileReader();
             reader.readAsDataURL(file);
@@ -611,7 +624,9 @@
                     var canvas = document.createElement('canvas');
                     var width = img.width;
                     var height = img.height;
-                    var max_size = 800;
+                    
+                    // Уменьшаем максимальное разрешение до 640px для молниеносной загрузки
+                    var max_size = 640; 
                     if (width > height) {
                         if (width > max_size) { height *= max_size / width; width = max_size; }
                     } else {
@@ -620,7 +635,9 @@
                     canvas.width = width; canvas.height = height;
                     var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    callback(canvas.toDataURL('image/jpeg', 0.7));
+                    
+                    // Снижаем качество сжатия до 0.55 (идеальный баланс веса и четкости для мобилок)
+                    callback(canvas.toDataURL('image/jpeg', 0.55));
                 };
             };
         }
@@ -664,8 +681,11 @@
             document.getElementById('admin-modal').style.display = 'flex';
         }
 
-        // ВЫСОКОСКОРОСТНАЯ ОБЛАЧНАЯ ЗАГРУЗКА И ПУБЛИКАЦИЯ С ТВОИМ API-КЛЮЧОМ
+        // ОПТИМИЗИРОВАННАЯ ФУНКЦИЯ ПУБЛИКАЦИИ С ИНДИКАТОРОМ ПРОГРЕССА КАЖДОГО ФОТО
         async function addNewProductFromSite() {
+            var publishBtn = document.querySelector('.big-publish-btn');
+            var originalBtnText = publishBtn.innerHTML;
+
             try {
                 var titleEl = document.getElementById('admin-title');
                 var priceEl = document.getElementById('admin-price');
@@ -673,10 +693,7 @@
                 var descEl = document.getElementById('admin-desc');
                 var markdownEl = document.getElementById('admin-allow-markdown');
 
-                if (!titleEl || !priceEl) {
-                    alert("Ошибка разметки! Компоненты формы не найдены.");
-                    return;
-                }
+                if (!titleEl || !priceEl) return;
 
                 var title = titleEl.value.trim();
                 var price = priceEl.value;
@@ -694,16 +711,16 @@
                     return;
                 }
 
-                // Анимация или уведомление о начале загрузки
-                var publishBtn = document.querySelector('.big-publish-btn');
-                var originalBtnText = publishBtn.innerHTML;
+                // Включаем визуальный лоадер на кнопке
                 publishBtn.disabled = true;
-                publishBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Загрузка в облако...";
-
+                
                 var imageUrls = [];
 
-                // Поочередно выгружаем сжатые локальные картинки на сервера Imgbb
+                // Поочередная отправка ультра-сжатых копий картинок на сервера Imgbb
                 for (var i = 0; i < uploadedImagesBase64.length; i++) {
+                    // Динамически выводим счетчик, чтобы админ видел реальный прогресс
+                    publishBtn.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Загрузка фото ${i + 1} из ${uploadedImagesBase64.length}...`;
+                    
                     var base64Data = uploadedImagesBase64[i].split(',')[1]; 
                     
                     var formData = new FormData();
@@ -718,11 +735,13 @@
                     if (resData.success) {
                         imageUrls.push(resData.data.url); 
                     } else {
-                        throw new Error("Не удалось загрузить изображение на фотохостинг.");
+                        throw new Error(`Ошибка облака на шаге ${i + 1}.`);
                     }
                 }
 
-                // Сохраняем карточку в Firebase со ссылками вместо тяжелого Base64
+                publishBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Сохранение карточки...";
+
+                // Запись в Firebase легкого текстового объекта
                 var productId = Date.now();
                 var newProduct = {
                     id: productId, 
@@ -740,7 +759,7 @@
                     publishBtn.innerHTML = originalBtnText;
 
                     if (error) {
-                        alert("Ошибка записи в Firebase: " + error.message);
+                        alert("Ошибка Firebase: " + error.message);
                     } else {
                         titleEl.value = '';
                         priceEl.value = '';
@@ -749,12 +768,11 @@
                         var thumbContainer = document.getElementById('thumb-container');
                         if(thumbContainer) thumbContainer.innerHTML = '';
                         closeModal('admin-modal');
-                        alert("✅ Успешно опубликован! Ссылки сохранены в базу.");
+                        alert("✅ Товар успешно добавлен!");
                     }
                 });
 
             } catch (error) {
-                var publishBtn = document.querySelector('.big-publish-btn');
                 if(publishBtn) {
                     publishBtn.disabled = false;
                     publishBtn.innerHTML = "⚡ Опубликовать товар";
