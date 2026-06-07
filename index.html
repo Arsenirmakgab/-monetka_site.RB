@@ -6,6 +6,10 @@
     <title>Монетка Маркет</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
+    <!-- ОФИЦИАЛЬНЫЕ КЛАССИЧЕСКИЕ БИБЛИОТЕКИ FIREBASE (Стабильные, без конфликтов импорта) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
         :root {
             --bg-main: #131a26;
@@ -366,6 +370,7 @@
 <body>
 
     <div class="mobile-container">
+        <!-- ШАПКА -->
         <header>
             <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
             <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
@@ -378,10 +383,12 @@
             </button>
         </header>
 
+        <!-- КАТЕГОРИИ -->
         <div class="sticky-categories" id="categories-wrapper">
             <div class="categories-bar" id="categories-list"></div>
         </div>
 
+        <!-- ОСНОВНОЙ КОНТЕНТ -->
         <main>
             <section id="shop-section" class="section active">
                 <div class="products-grid" id="products-container"></div>
@@ -408,10 +415,12 @@
             </section>
         </main>
 
+        <!-- КНОПКА ПЛЮС ДЛЯ АДМИНА -->
         <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
             <i class="fa-solid fa-plus"></i>
         </button>
 
+        <!-- НИЖНЯЯ НАВИГАЦИЯ -->
         <nav class="mobile-nav">
             <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
                 <i class="fa-solid fa-store"></i><span>Магазин</span>
@@ -425,6 +434,7 @@
         </nav>
     </div>
 
+    <!-- МОДАЛКА: АДМИН-ФОРМА -->
     <div class="modal" id="admin-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
@@ -439,6 +449,7 @@
                 <input type="number" id="admin-price" class="admin-input" placeholder="Например: 50">
             </div>
 
+            <!-- ТУМБЛЕР УЦЕНКИ -->
             <div class="admin-form-group">
                 <div class="toggle-container">
                     <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Применять авто-уценку</span>
@@ -474,10 +485,12 @@
                 <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
             </div>
             
+            <!-- КНОПКА ПУБЛИКАЦИИ -->
             <button class="big-publish-btn" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
         </div>
     </div>
 
+    <!-- МОДАЛКА: ПРОСМОТР ТОВАРA -->
     <div class="modal" id="product-detail-modal" style="display: none;">
         <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
             <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
@@ -485,6 +498,7 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА: КОРЗИНА -->
     <div class="modal" id="cart-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
@@ -498,53 +512,34 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
-
-        // Конфигурация Firebase
-        const firebaseConfig = {
+    <!-- СТАНДАРТНЫЙ СЦЕНАРИЙ С ПОЛНОЙ ПОДДЕРЖКОЙ КНОПОК ONCLICK -->
+    <script>
+        // Инициализация конфигурации БД Firebase
+        var firebaseConfig = {
             databaseURL: "https://monetka-market-default-rtdb.europe-west1.firebasedatabase.app/"
         };
+        
+        // Запуск Firebase v8
+        firebase.initializeApp(firebaseConfig);
+        var db = firebase.database();
 
-        // Инициализируем базу
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // Тестовый режим уценки (false — 15 дней, true — 1 минута)
+        var TEST_MODE = false; 
 
-        // Настройка тестового режима уценки (false — 15 дней, true — 1 минута)
-        const TEST_MODE = false; 
+        var products = [];
+        var cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
+        var currentCategory = 'all';
+        var isAdminMode = localStorage.getItem('monetka_admin') === 'true';
+        var uploadedImagesBase64 = []; 
 
-        let products = [];
-        let cart = JSON.parse(localStorage.getItem('monetka_cart')) || [];
-        let currentCategory = 'all';
-        let isAdminMode = localStorage.getItem('monetka_admin') === 'true';
-        let uploadedImagesBase64 = []; 
-
-        // Делаем функции доступными для вызова из HTML кнопок (для модульного скрипта)
-        window.addNewProductFromSite = addNewProductFromSite;
-        window.handleMultipleFiles = handleMultipleFiles;
-        window.removeThumbnail = removeThumbnail;
-        window.openAdminModal = openAdminModal;
-        window.closeModal = closeModal;
-        window.handleLogoClick = handleLogoClick;
-        window.logoutAdmin = logoutAdmin;
-        window.switchTab = switchTab;
-        window.changeCategory = changeCategory;
-        window.addToCartWithPrice = addToCartWithPrice;
-        window.removeFromCart = removeFromCart;
-        window.openCartModal = openCartModal;
-        window.openDetailModal = openDetailModal;
-        window.deleteProduct = deleteProduct;
-        window.moveSlider = moveSlider;
-
-        // Точка старта работы скрипта
+        // Инициализация при запуске страницы
         applyAdminUI();
         updateCartUI();
         listenToCloudProducts();
 
         function applyAdminUI() {
-            const indicator = document.getElementById('admin-indicator');
-            const floatBtn = document.getElementById('panel-add-btn');
+            var indicator = document.getElementById('admin-indicator');
+            var floatBtn = document.getElementById('panel-add-btn');
             if (isAdminMode) {
                 if (indicator) indicator.style.display = 'flex';
                 if (floatBtn) floatBtn.style.display = 'flex';
@@ -555,20 +550,19 @@
         }
 
         function listenToCloudProducts() {
-            const productsRef = ref(db, 'products');
-            onValue(productsRef, (snapshot) => {
-                const data = snapshot.val();
+            db.ref('products').on('value', function(snapshot) {
+                var data = snapshot.val();
                 if (data) {
-                    products = Object.values(data).sort((a, b) => b.id - a.id);
+                    products = Object.values(data).sort(function(a, b) { return b.id - a.id; });
                 } else {
                     products = [];
                 }
                 localStorage.setItem('monetka_products_backup', JSON.stringify(products));
                 renderCategories();
                 renderProducts();
-            }, (error) => {
+            }, function(error) {
                 console.log("Режим офлайн. Загрузка бэкапа.");
-                const localData = localStorage.getItem('monetka_products_backup');
+                var localData = localStorage.getItem('monetka_products_backup');
                 if (localData) {
                     products = JSON.parse(localData);
                     renderCategories();
@@ -580,7 +574,7 @@
         function handleLogoClick() {
             switchTab('shop');
             if (!isAdminMode) {
-                let pass = prompt("Введите пароль администратора:");
+                var pass = prompt("Введите пароль администратора:");
                 if (pass === "13579") {
                     localStorage.setItem('monetka_admin', 'true');
                     alert("Вход в админку выполнен!");
@@ -599,44 +593,44 @@
         }
 
         function calculateCurrentPrice(prod) {
-            const basePrice = Number(prod.price);
+            var basePrice = Number(prod.price);
             if (prod.allowMarkdown === false || !prod.timestamp) {
                 return { current: basePrice, oldPrices: [], badge: null };
             }
-            const now = Date.now();
-            const diffMs = now - prod.timestamp;
-            const interval1 = TEST_MODE ? (60 * 1000) : (15 * 24 * 60 * 60 * 1000); 
-            const interval2 = TEST_MODE ? (120 * 1000) : (30 * 24 * 60 * 60 * 1000);
+            var now = Date.now();
+            var diffMs = now - prod.timestamp;
+            var interval1 = TEST_MODE ? (60 * 1000) : (15 * 24 * 60 * 60 * 1000); 
+            var interval2 = TEST_MODE ? (120 * 1000) : (30 * 24 * 60 * 60 * 1000);
 
             if (diffMs >= interval2) {
-                const price1 = Math.round(basePrice * 0.8 * 100) / 100;
-                const price2 = Math.round(price1 * 0.7 * 100) / 100;
+                var price1 = Math.round(basePrice * 0.8 * 100) / 100;
+                var price2 = Math.round(price1 * 0.7 * 100) / 100;
                 return { current: price2, oldPrices: [basePrice, price1], badge: '-30%' };
             } else if (diffMs >= interval1) {
-                const price1 = Math.round(basePrice * 0.8 * 100) / 100;
+                var price1 = Math.round(basePrice * 0.8 * 100) / 100;
                 return { current: price1, oldPrices: [basePrice], badge: '-20%' };
             }
             return { current: basePrice, oldPrices: [], badge: null };
         }
 
         function compressImage(file, callback) {
-            const reader = new FileReader();
+            var reader = new FileReader();
             reader.readAsDataURL(file);
             reader.onload = function (e) {
-                const img = new Image();
+                var img = new Image();
                 img.src = e.target.result;
                 img.onload = function () {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const max_size = 800;
+                    var canvas = document.createElement('canvas');
+                    var width = img.width;
+                    var height = img.height;
+                    var max_size = 800;
                     if (width > height) {
                         if (width > max_size) { height *= max_size / width; width = max_size; }
                     } else {
                         if (height > max_size) { width *= max_size / height; height = max_size; }
                     }
                     canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d');
+                    var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     callback(canvas.toDataURL('image/jpeg', 0.7));
                 };
@@ -644,12 +638,12 @@
         }
 
         function handleMultipleFiles(event) {
-            const files = Array.from(event.target.files);
+            var files = Array.from(event.target.files);
             if (uploadedImagesBase64.length + files.length > 3) {
                 alert("Можно загрузить максимум 3 фотографии!");
                 return;
             }
-            files.forEach(file => {
+            files.forEach(function(file) {
                 compressImage(file, function(compressedBase64) {
                     uploadedImagesBase64.push(compressedBase64);
                     renderThumbnails();
@@ -659,14 +653,16 @@
         }
 
         function renderThumbnails() {
-            const container = document.getElementById('thumb-container');
+            var container = document.getElementById('thumb-container');
             if (!container) return;
-            container.innerHTML = uploadedImagesBase64.map((img, idx) => `
-                <div class="thumb-wrapper">
-                    <img src="${img}">
-                    <button class="thumb-remove" onclick="removeThumbnail(${idx})">&times;</button>
-                </div>
-            `).join('');
+            container.innerHTML = uploadedImagesBase64.map(function(img, idx) {
+                return `
+                    <div class="thumb-wrapper">
+                        <img src="${img}">
+                        <button class="thumb-remove" onclick="removeThumbnail(${idx})">&times;</button>
+                    </div>
+                `;
+            }).join('');
         }
 
         function removeThumbnail(index) {
@@ -680,33 +676,33 @@
             document.getElementById('admin-modal').style.display = 'flex';
         }
 
-        // АБСОЛЮТНО АВТОНОМНАЯ И РАБОЧАЯ ФУНКЦИЯ ДОБАВЛЕНИЯ ТОВАРА
+        // АБСОЛЮТНО АВТОНОМНОЕ И РАБОЧЕЕ ДОБАВЛЕНИЕ БЕЗ СЕТЕВЫХ БЛОКИРОВОК БРАУЗЕРА
         function addNewProductFromSite() {
             try {
-                const titleEl = document.getElementById('admin-title');
-                const priceEl = document.getElementById('admin-price');
-                const categoryEl = document.getElementById('admin-category');
-                const descEl = document.getElementById('admin-desc');
-                const markdownEl = document.getElementById('admin-allow-markdown');
+                var titleEl = document.getElementById('admin-title');
+                var priceEl = document.getElementById('admin-price');
+                var categoryEl = document.getElementById('admin-category');
+                var descEl = document.getElementById('admin-desc');
+                var markdownEl = document.getElementById('admin-allow-markdown');
 
                 if (!titleEl || !priceEl) {
                     alert("Ошибка разметки! Компоненты формы не найдены.");
                     return;
                 }
 
-                const title = titleEl.value.trim();
-                const price = priceEl.value;
-                const category = categoryEl ? categoryEl.value : "Общее";
-                const desc = descEl ? descEl.value.trim() : "Описание отсутствует.";
-                const allowMarkdown = markdownEl ? markdownEl.checked : true;
+                var title = titleEl.value.trim();
+                var price = priceEl.value;
+                var category = categoryEl ? categoryEl.value : "Общее";
+                var desc = descEl ? descEl.value.trim() : "Описание отсутствует.";
+                var allowMarkdown = markdownEl ? markdownEl.checked : true;
 
                 if (!title || !price) {
                     alert("Заполните поля Название и Цена!");
                     return;
                 }
 
-                const productId = Date.now();
-                const newProduct = {
+                var productId = Date.now();
+                var newProduct = {
                     id: productId, 
                     timestamp: Date.now(), 
                     title: title,
@@ -714,20 +710,20 @@
                     category: category,
                     desc: desc,
                     allowMarkdown: allowMarkdown, 
-                    images: [...uploadedImagesBase64]
+                    images: uploadedImagesBase64
                 };
 
-                set(ref(db, 'products/' + productId), newProduct)
-                .then(() => {
-                    titleEl.value = '';
-                    priceEl.value = '';
-                    if(descEl) descEl.value = '';
-                    uploadedImagesBase64 = [];
-                    closeModal('admin-modal');
-                    alert("✅ Успешно! Карточка добавлена и сохранена в базе.");
-                })
-                .catch((err) => {
-                    alert("Ошибка записи в Firebase: " + err.message);
+                db.ref('products/' + productId).set(newProduct, function(error) {
+                    if (error) {
+                        alert("Ошибка записи в Firebase: " + error.message);
+                    } else {
+                        titleEl.value = '';
+                        priceEl.value = '';
+                        if(descEl) descEl.value = '';
+                        uploadedImagesBase64 = [];
+                        closeModal('admin-modal');
+                        alert("✅ Успешно! Товар сразу добавлен и сохранен.");
+                    }
                 });
 
             } catch (error) {
@@ -736,16 +732,16 @@
         }
 
         function deleteProduct(id, event) {
-            event.stopPropagation(); 
+            if (event) event.stopPropagation(); 
             if (confirm("Удалить этот товар со всех устройств навсегда?")) {
-                remove(ref(db, 'products/' + id));
+                db.ref('products/' + id).remove();
             }
         }
 
         function generateSliderHtml(productId, imagesArray) {
-            const imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
-            let slidesHtml = imgs.map(img => `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`).join('');
-            let arrowsHtml = '';
+            var imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
+            var slidesHtml = imgs.map(function(img) { return `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`; }).join('');
+            var arrowsHtml = '';
             if (imgs.length > 1) {
                 arrowsHtml = `
                     <button class="slider-arrow prev" onclick="moveSlider(${productId}, -1, event)">◀</button>
@@ -757,49 +753,49 @@
 
         function moveSlider(productId, direction, event) {
             if (event) event.stopPropagation();
-            const slider = document.getElementById(`slider-${productId}`);
-            const track = document.getElementById(`track-${productId}`);
+            var slider = document.getElementById('slider-' + productId);
+            var track = document.getElementById('track-' + productId);
             if (!slider || !track) return;
-            let current = parseInt(slider.getAttribute('data-current'));
-            const max = parseInt(slider.getAttribute('data-max'));
+            var current = parseInt(slider.getAttribute('data-current'));
+            var max = parseInt(slider.getAttribute('data-max'));
             current += direction;
             if (current < 0) current = max - 1;
             if (current >= max) current = 0;
             slider.setAttribute('data-current', current);
-            track.style.transform = `translateX(-${current * 100}%)`;
+            track.style.transform = 'translateX(-' + (current * 100) + '%)';
         }
 
         function renderProducts() {
-            const container = document.getElementById('products-container');
+            var container = document.getElementById('products-container');
             if (!container) return;
             container.innerHTML = '';
 
-            const filtered = currentCategory === 'all' ? products : products.filter(p => p.category === currentCategory);
+            var filtered = currentCategory === 'all' ? products : products.filter(function(p) { return p.category === currentCategory; });
 
             if (filtered.length === 0) {
                 container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem 0; grid-column: span 3; font-size:0.8rem;">Товаров пока нет.</p>';
                 return;
             }
 
-            filtered.forEach((prod) => {
-                const card = document.createElement('div');
+            filtered.forEach(function(prod) {
+                var card = document.createElement('div');
                 card.className = 'product-card';
-                card.setAttribute('onclick', `openDetailModal(${prod.id}, event)`);
+                card.setAttribute('onclick', 'openDetailModal(' + prod.id + ', event)');
 
-                const priceInfo = calculateCurrentPrice(prod);
-                const deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
+                var priceInfo = calculateCurrentPrice(prod);
+                var deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
                 
-                const imagesList = prod.images ? Object.values(prod.images) : [];
-                const coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
+                var imagesList = prod.images ? Object.values(prod.images) : [];
+                var coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
 
-                let oldPricesHtml = '';
-                let isDiscountedClass = '';
+                var oldPricesHtml = '';
+                var isDiscountedClass = '';
                 if (priceInfo.oldPrices.length > 0) {
                     isDiscountedClass = 'discounted';
-                    oldPricesHtml = `<div class="old-prices-box">${priceInfo.oldPrices.map(p => p + ' BYN').join(' → ')}</div>`;
+                    oldPricesHtml = `<div class="old-prices-box">${priceInfo.oldPrices.map(function(p) { return p + ' BYN'; }).join(' → ')}</div>`;
                 }
 
-                let badgeHtml = priceInfo.badge ? `<div class="markdown-badge">${priceInfo.badge}</div>` : '';
+                var badgeHtml = priceInfo.badge ? `<div class="markdown-badge">${priceInfo.badge}</div>` : '';
 
                 card.innerHTML = `
                     ${badgeHtml}
@@ -823,18 +819,18 @@
         }
 
         function openDetailModal(id, event) {
-            if (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn')) return;
-            const prod = products.find(p => p.id === id);
+            if (event && (event.target.closest('.card-btn') || event.target.closest('.delete-card-btn'))) return;
+            var prod = products.find(function(p) { return p.id === id; });
             if (!prod) return;
 
-            const priceInfo = calculateCurrentPrice(prod);
-            const content = document.getElementById('modal-detail-content');
-            const imagesList = prod.images ? Object.values(prod.images) : [];
-            const modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
+            var priceInfo = calculateCurrentPrice(prod);
+            var content = document.getElementById('modal-detail-content');
+            var imagesList = prod.images ? Object.values(prod.images) : [];
+            var modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
 
-            let oldPricesHtml = '';
+            var oldPricesHtml = '';
             if (priceInfo.oldPrices.length > 0) {
-                oldPricesHtml = `<div style="font-size:0.9rem; color:var(--text-muted); text-decoration:line-through; margin-bottom: 2px;">Старая цена: ${priceInfo.oldPrices.map(p => p + ' BYN').join(' → ')}</div>`;
+                oldPricesHtml = `<div style="font-size:0.9rem; color:var(--text-muted); text-decoration:line-through; margin-bottom: 2px;">Старая цена: ${priceInfo.oldPrices.map(function(p) { return p + ' BYN'; }).join(' → ')}</div>`;
             }
 
             content.innerHTML = `
@@ -857,23 +853,25 @@
         }
 
         function switchTab(tabName) {
-            document.querySelectorAll('.mobile-nav-item').forEach(item => item.classList.remove('active'));
-            const activeNav = document.getElementById(`nav-${tabName}`);
+            document.querySelectorAll('.mobile-nav-item').forEach(function(item) { item.classList.remove('active'); });
+            var activeNav = document.getElementById('nav-' + tabName);
             if (activeNav) activeNav.classList.add('active');
-            document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
-            document.getElementById(`${tabName}-section`).style.display = 'block';
-            const categoriesWrapper = document.getElementById('categories-wrapper');
+            document.querySelectorAll('.section').forEach(function(sec) { sec.style.display = 'none'; });
+            document.getElementById(tabName + '-section').style.display = 'block';
+            var categoriesWrapper = document.getElementById('categories-wrapper');
             if (categoriesWrapper) categoriesWrapper.style.display = tabName === 'shop' ? 'block' : 'none';
         }
 
         function renderCategories() {
-            const baseCategories = ['all'];
-            products.forEach(p => {
+            var baseCategories = ['all'];
+            products.forEach(function(p) {
                 if (p.category && !baseCategories.includes(p.category)) baseCategories.push(p.category);
             });
-            const container = document.getElementById('categories-list');
+            var container = document.getElementById('categories-list');
             if (!container) return;
-            container.innerHTML = baseCategories.map(cat => `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${cat === 'all' ? 'Все' : cat}</div>`).join('');
+            container.innerHTML = baseCategories.map(function(cat) {
+                return `<div class="category-chip ${currentCategory === cat ? 'active' : ''}" onclick="changeCategory('${cat}')">${cat === 'all' ? 'Все' : cat}</div>`;
+            }).join('');
         }
 
         function changeCategory(category) {
@@ -884,10 +882,10 @@
 
         function addToCartWithPrice(id, currentPrice, event) {
             if(event) event.stopPropagation();
-            const prod = products.find(p => p.id === id);
+            var prod = products.find(function(p) { return p.id === id; });
             if (!prod) return;
 
-            const cartItem = { ...prod, finalPrice: currentPrice };
+            var cartItem = Object.assign({}, prod, { finalPrice: currentPrice });
             cart.push(cartItem);
             localStorage.setItem('monetka_cart', JSON.stringify(cart));
             updateCartUI();
@@ -901,7 +899,7 @@
         }
 
         function updateCartUI() {
-            const countElement = document.getElementById('cart-count');
+            var countElement = document.getElementById('cart-count');
             if (countElement) countElement.textContent = cart.length;
         }
 
@@ -911,8 +909,8 @@
         }
 
         function renderCartItems() {
-            const container = document.getElementById('cart-items-container');
-            const totalElement = document.getElementById('cart-total-price');
+            var container = document.getElementById('cart-items-container');
+            var totalElement = document.getElementById('cart-total-price');
             if (!container) return;
             
             if (cart.length === 0) {
@@ -921,12 +919,12 @@
                 return;
             }
 
-            let total = 0;
-            container.innerHTML = cart.map((item, index) => {
-                const itemPrice = Number(item.finalPrice || item.price);
+            var total = 0;
+            container.innerHTML = cart.map(function(item, index) {
+                var itemPrice = Number(item.finalPrice || item.price);
                 total += itemPrice;
-                const imagesList = item.images ? Object.values(item.images) : [];
-                const itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
+                var imagesList = item.images ? Object.values(item.images) : [];
+                var itemPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/100x100/1f293d/ffffff?text=📦';
                 return `
                     <div class="cart-item">
                         <img src="${itemPhoto}" style="width:50px; height:50px; object-fit:cover; border-radius:6px;">
@@ -939,7 +937,7 @@
                 `;
             }).join('');
 
-            totalElement.textContent = `${total.toLocaleString()} BYN`;
+            totalElement.textContent = total.toLocaleString() + ' BYN';
         }
 
         function closeModal(modalId) {
