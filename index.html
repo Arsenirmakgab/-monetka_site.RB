@@ -6,7 +6,6 @@
     <title>Монетка Маркет</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
-    <!-- ОФИЦИАЛЬНЫЕ КЛАССИЧЕСКИЕ БИБЛИОТЕКИ FIREBASE (Стабильные, без конфликтов импорта) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -370,7 +369,6 @@
 <body>
 
     <div class="mobile-container">
-        <!-- ШАПКА -->
         <header>
             <div class="logo" onclick="handleLogoClick()"><span>🪙</span> Монетка</div>
             <div id="admin-indicator" style="display: none; gap: 8px; align-items: center;">
@@ -383,12 +381,10 @@
             </button>
         </header>
 
-        <!-- КАТЕГОРИИ -->
         <div class="sticky-categories" id="categories-wrapper">
             <div class="categories-bar" id="categories-list"></div>
         </div>
 
-        <!-- ОСНОВНОЙ КОНТЕНТ -->
         <main>
             <section id="shop-section" class="section active">
                 <div class="products-grid" id="products-container"></div>
@@ -415,12 +411,10 @@
             </section>
         </main>
 
-        <!-- КНОПКА ПЛЮС ДЛЯ АДМИНА -->
         <button class="float-add-btn" id="panel-add-btn" onclick="openAdminModal()">
             <i class="fa-solid fa-plus"></i>
         </button>
 
-        <!-- НИЖНЯЯ НАВИГАЦИЯ -->
         <nav class="mobile-nav">
             <div onclick="switchTab('shop')" id="nav-shop" class="mobile-nav-item active">
                 <i class="fa-solid fa-store"></i><span>Магазин</span>
@@ -434,7 +428,6 @@
         </nav>
     </div>
 
-    <!-- МОДАЛКА: АДМИН-ФОРМА -->
     <div class="modal" id="admin-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('admin-modal')">&times;</button>
@@ -449,7 +442,6 @@
                 <input type="number" id="admin-price" class="admin-input" placeholder="Например: 50">
             </div>
 
-            <!-- ТУМБЛЕР УЦЕНКИ -->
             <div class="admin-form-group">
                 <div class="toggle-container">
                     <span style="font-size: 0.9rem; font-weight: bold; color: #fff;"><i class="fa-solid fa-tags" style="color: var(--danger)"></i> Применять авто-уценку</span>
@@ -470,7 +462,7 @@
             </div>
             
             <div class="admin-form-group">
-                <label>Фото товара (сжатие на лету):</label>
+                <label>Фото товара (макс. 3 фото):</label>
                 <div style="position: relative; overflow: hidden;">
                     <div class="file-input-btn">
                         <i class="fa-solid fa-camera"></i> Выбрать файлы
@@ -485,12 +477,10 @@
                 <textarea id="admin-desc" class="admin-input" rows="3" placeholder="Краткое описание товара..."></textarea>
             </div>
             
-            <!-- КНОПКА ПУБЛИКАЦИИ -->
             <button class="big-publish-btn" onclick="addNewProductFromSite()">⚡ Опубликовать товар</button>
         </div>
     </div>
 
-    <!-- МОДАЛКА: ПРОСМОТР ТОВАРA -->
     <div class="modal" id="product-detail-modal" style="display: none;">
         <div class="modal-content" style="padding: 0; overflow: hidden; border-radius: 16px;">
             <button class="close-modal" onclick="closeModal('product-detail-modal')" style="right: 12px; top: 12px; background: rgba(0,0,0,0.6); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 10;">&times;</button>
@@ -498,7 +488,6 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: КОРЗИНА -->
     <div class="modal" id="cart-modal" style="display: none;">
         <div class="modal-content">
             <button class="close-modal" onclick="closeModal('cart-modal')">&times;</button>
@@ -512,7 +501,6 @@
         </div>
     </div>
 
-    <!-- СТАНДАРТНЫЙ СЦЕНАРИЙ С ПОЛНОЙ ПОДДЕРЖКОЙ КНОПОК ONCLICK -->
     <script>
         // Инициализация конфигурации БД Firebase
         var firebaseConfig = {
@@ -676,8 +664,8 @@
             document.getElementById('admin-modal').style.display = 'flex';
         }
 
-        // АБСОЛЮТНО АВТОНОМНОЕ И РАБОЧЕЕ ДОБАВЛЕНИЕ БЕЗ СЕТЕВЫХ БЛОКИРОВОК БРАУЗЕРА
-        function addNewProductFromSite() {
+        // ВЫСОКОСКОРОСТНАЯ ОБЛАЧНАЯ ЗАГРУЗКА И ПУБЛИКАЦИЯ С ТВОИМ API-КЛЮЧОМ
+        async function addNewProductFromSite() {
             try {
                 var titleEl = document.getElementById('admin-title');
                 var priceEl = document.getElementById('admin-price');
@@ -701,6 +689,40 @@
                     return;
                 }
 
+                if (uploadedImagesBase64.length === 0) {
+                    alert("Добавьте хотя бы одно фото товара!");
+                    return;
+                }
+
+                // Анимация или уведомление о начале загрузки
+                var publishBtn = document.querySelector('.big-publish-btn');
+                var originalBtnText = publishBtn.innerHTML;
+                publishBtn.disabled = true;
+                publishBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Загрузка в облако...";
+
+                var imageUrls = [];
+
+                // Поочередно выгружаем сжатые локальные картинки на сервера Imgbb
+                for (var i = 0; i < uploadedImagesBase64.length; i++) {
+                    var base64Data = uploadedImagesBase64[i].split(',')[1]; 
+                    
+                    var formData = new FormData();
+                    formData.append("image", base64Data);
+
+                    var response = await fetch("https://api.imgbb.com/1/upload?key=6ca30c86a04081f563583ef58832efe5", {
+                        method: "POST",
+                        body: formData
+                    });
+
+                    var resData = await response.json();
+                    if (resData.success) {
+                        imageUrls.push(resData.data.url); 
+                    } else {
+                        throw new Error("Не удалось загрузить изображение на фотохостинг.");
+                    }
+                }
+
+                // Сохраняем карточку в Firebase со ссылками вместо тяжелого Base64
                 var productId = Date.now();
                 var newProduct = {
                     id: productId, 
@@ -710,10 +732,13 @@
                     category: category,
                     desc: desc,
                     allowMarkdown: allowMarkdown, 
-                    images: uploadedImagesBase64
+                    images: imageUrls 
                 };
 
                 db.ref('products/' + productId).set(newProduct, function(error) {
+                    publishBtn.disabled = false;
+                    publishBtn.innerHTML = originalBtnText;
+
                     if (error) {
                         alert("Ошибка записи в Firebase: " + error.message);
                     } else {
@@ -721,13 +746,20 @@
                         priceEl.value = '';
                         if(descEl) descEl.value = '';
                         uploadedImagesBase64 = [];
+                        var thumbContainer = document.getElementById('thumb-container');
+                        if(thumbContainer) thumbContainer.innerHTML = '';
                         closeModal('admin-modal');
-                        alert("✅ Успешно! Товар сразу добавлен и сохранен.");
+                        alert("✅ Успешно опубликован! Ссылки сохранены в базу.");
                     }
                 });
 
             } catch (error) {
-                alert("Ошибка выполнения скрипта: " + error.message);
+                var publishBtn = document.querySelector('.big-publish-btn');
+                if(publishBtn) {
+                    publishBtn.disabled = false;
+                    publishBtn.innerHTML = "⚡ Опубликовать товар";
+                }
+                alert("Ошибка при публикации: " + error.message);
             }
         }
 
