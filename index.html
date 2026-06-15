@@ -463,7 +463,7 @@
             </div>
             
             <div class="admin-form-group">
-                <label>Фото товара (макс. 3 photo):</label>
+                <label>Фото товара (макс. 3 фото):</label>
                 <div style="position: relative; overflow: hidden;">
                     <div class="file-input-btn">
                         <i class="fa-solid fa-camera"></i> Выбрать файлы
@@ -542,7 +542,12 @@
             db.ref('products').on('value', function(snapshot) {
                 var data = snapshot.val();
                 if (data) {
-                    products = Object.values(data).sort(function(a, b) { return b.id - a.id; });
+                    // Превращаем объект Firebase (где ключи — это ID, сгенерированные через push) в читаемый массив
+                    products = Object.keys(data).map(function(key) {
+                        var item = data[key];
+                        if (!item.id) item.id = key; // Защита ID
+                        return item;
+                    }).sort(function(a, b) { return b.timestamp - a.timestamp; });
                 } else {
                     products = [];
                 }
@@ -602,7 +607,6 @@
             return { current: basePrice, oldPrices: [], badge: null };
         }
 
-        // МОДИФИЦИРОВАННОЕ СВЕРХБЫСТРОЕ СЖАТИЕ КАРТИНКИ С УМЕНЬШЕНИЕМ ВЕСА В 10 РАЗ
         function compressImage(file, callback) {
             var reader = new FileReader();
             reader.readAsDataURL(file);
@@ -614,7 +618,6 @@
                     var width = img.width;
                     var height = img.height;
                     
-                    // Сжатие до 640px по большей стороне
                     var max_size = 640; 
                     if (width > height) {
                         if (width > max_size) { height *= max_size / width; width = max_size; }
@@ -625,7 +628,6 @@
                     var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    // Качество 0.55 — весит копейки, грузится моментально
                     callback(canvas.toDataURL('image/jpeg', 0.55));
                 };
             };
@@ -670,7 +672,7 @@
             document.getElementById('admin-modal').style.display = 'flex';
         }
 
-        // ВЫСОКОСКОРОСТНАЯ АСИНХРОННАЯ ФУНКЦИЯ ПУБЛИКАЦИИ С КЛИЕНТСКИМ «УСКОРЕНИЕМ»
+        // БЕЗУПРЕЧНАЯ ФУНКЦИЯ НАКОПЛЕНИЯ КАРТОЧЕК ЧЕРЕЗ .PUSH()
         async function addNewProductFromSite() {
             var publishBtn = document.querySelector('.big-publish-btn');
             var originalBtnText = publishBtn.innerHTML;
@@ -703,7 +705,6 @@
                 publishBtn.disabled = true;
                 var imageUrls = [];
 
-                // 1. Поочередно заливаем ультра-сжатые фото в облако Imgbb
                 for (var i = 0; i < uploadedImagesBase64.length; i++) {
                     publishBtn.innerHTML = `<i class='fa-solid fa-spinner fa-spin'></i> Загрузка фото ${i + 1} из ${uploadedImagesBase64.length}...`;
                     
@@ -724,12 +725,14 @@
                     }
                 }
 
-                publishBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Сохранение...";
+                publishBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> Добавление...";
 
-                // 2. Создаем легкий текстовый объект для БД
-                var productId = Date.now();
+                // Генерируем уникальную ссылку-контейнер в Firebase через push()
+                var newProductRef = db.ref('products').push();
+                var generatedId = newProductRef.key; // Уникальный ID карточки
+
                 var newProduct = {
-                    id: productId, 
+                    id: generatedId, 
                     timestamp: Date.now(), 
                     title: title,
                     price: parseFloat(price),
@@ -739,10 +742,9 @@
                     images: imageUrls 
                 };
 
-                // 🚀 ОПТИМИЗАЦИЯ: Пишем в БД асинхронно без ожидания ответа от сервера!
-                db.ref('products/' + productId).set(newProduct);
+                // Записываем карточку в свой уникальный узел (предыдущие 20 штук останутся нетронутыми!)
+                newProductRef.set(newProduct);
 
-                // Интерфейс очищается и закрывается НАЙСЕКУНДНО
                 publishBtn.disabled = false;
                 publishBtn.innerHTML = originalBtnText;
 
@@ -754,7 +756,7 @@
                 if(thumbContainer) thumbContainer.innerHTML = '';
                 
                 closeModal('admin-modal');
-                alert("✅ Успешно! Товар отправлен на сайт.");
+                alert("✅ Успешно! Товар сохранен в общую ленту.");
 
             } catch (error) {
                 if(publishBtn) {
@@ -773,13 +775,15 @@
         }
 
         function generateSliderHtml(productId, imagesArray) {
+            // Экранируем строковый ID для передачи в селекторы
+            var safeId = "'" + productId + "'";
             var imgs = (imagesArray && imagesArray.length > 0) ? imagesArray : ['https://via.placeholder.com/480x320/1f293d/ffffff?text=📦'];
             var slidesHtml = imgs.map(function(img) { return `<div class="slider-slide"><img src="${img}" loading="lazy"></div>`; }).join('');
             var arrowsHtml = '';
             if (imgs.length > 1) {
                 arrowsHtml = `
-                    <button class="slider-arrow prev" onclick="moveSlider(${productId}, -1, event)">◀</button>
-                    <button class="slider-arrow next" onclick="moveSlider(${productId}, 1, event)">▶</button>
+                    <button class="slider-arrow prev" onclick="moveSlider(${safeId}, -1, event)">◀</button>
+                    <button class="slider-arrow next" onclick="moveSlider(${safeId}, 1, event)">▶</button>
                 `;
             }
             return `<div class="product-slider" id="slider-${productId}" data-current="0" data-max="${imgs.length}"><div class="slider-track" id="track-${productId}">${slidesHtml}</div>${arrowsHtml}</div>`;
@@ -814,10 +818,13 @@
             filtered.forEach(function(prod) {
                 var card = document.createElement('div');
                 card.className = 'product-card';
-                card.setAttribute('onclick', 'openDetailModal(' + prod.id + ', event)');
+                
+                // Передаем ID как строку
+                var safeId = "'" + prod.id + "'";
+                card.setAttribute('onclick', 'openDetailModal(' + safeId + ', event)');
 
                 var priceInfo = calculateCurrentPrice(prod);
-                var deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${prod.id}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
+                var deleteButtonHtml = isAdminMode ? `<button class="delete-card-btn" onclick="deleteProduct(${safeId}, event)"><i class="fa-solid fa-trash"></i></button>` : '';
                 
                 var imagesList = prod.images ? Object.values(prod.images) : [];
                 var coverPhoto = imagesList.length > 0 ? imagesList[0] : 'https://via.placeholder.com/150x200/1f293d/ffffff?text=📦';
@@ -841,7 +848,7 @@
                         </div>
                         <div class="product-title">${prod.title}</div>
                         <div class="card-actions-row">
-                            <button class="card-btn" onclick="addToCartWithPrice(${prod.id}, ${priceInfo.current}, event)">
+                            <button class="card-btn" onclick="addToCartWithPrice(${safeId}, ${priceInfo.current}, event)">
                                 <i class="fa-solid fa-cart-plus"></i>
                             </button>
                             ${deleteButtonHtml}
@@ -860,7 +867,10 @@
             var priceInfo = calculateCurrentPrice(prod);
             var content = document.getElementById('modal-detail-content');
             var imagesList = prod.images ? Object.values(prod.images) : [];
-            var modalSliderHtml = generateSliderHtml(prod.id + 9999, imagesList);
+            
+            // Генерируем уникальный ID для слайдера внутри модалки
+            var modalSliderHtml = generateSliderHtml(prod.id + "_modal", imagesList);
+            var safeId = "'" + prod.id + "'";
 
             var oldPricesHtml = '';
             if (priceInfo.oldPrices.length > 0) {
@@ -878,7 +888,7 @@
                     </div>
                     <h3 style="margin-bottom: 0.4rem; font-size: 1rem; color:#fff;">Описание:</h3>
                     <p style="color: var(--text-muted); line-height: 1.5; font-size:0.9rem;">${prod.desc}</p>
-                    <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem; height: auto;" onclick="addToCartWithPrice(${prod.id}, ${priceInfo.current}, null); closeModal('product-detail-modal');">
+                    <button class="card-btn" style="margin-top: 1.5rem; width:100%; padding:1rem; font-size: 0.9rem; height: auto;" onclick="addToCartWithPrice(${safeId}, ${priceInfo.current}, null); closeModal('product-detail-modal');">
                         <i class="fa-solid fa-cart-plus"></i> Добавить в корзину
                     </button>
                 </div>
