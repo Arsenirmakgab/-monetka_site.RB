@@ -9,10 +9,12 @@
     :root {
       --bg: #f5f5f5;
       --white: #ffffff;
-      --yellow: #ffdd00;
-      --black: #141414;
-      --gray: #757575;
+      --yellow: #FFCC00;
+      --black: #1A1A1A;
+      --gray: #6e6e6e;
       --border: #e0e0e0;
+      --danger: #d32f2f;
+      --success: #2e7d32;
       --radius: 8px;
     }
 
@@ -517,13 +519,126 @@
       gap: 8px;
     }
 
-    .input-field {
+    .input-field, .textarea-field, .select-field {
       width: 100%;
-      height: 38px;
-      padding: 0 10px;
+      padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 6px;
       font-size: 14px;
+      background: var(--white);
+    }
+
+    .input-field, .select-field {
+      height: 38px;
+    }
+
+    .textarea-field {
+      min-height: 68px;
+      resize: vertical;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    /* Админ-панель */
+    .admin-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      overflow-x: auto;
+    }
+
+    .admin-tab {
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: var(--bg);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .admin-tab.active {
+      background: var(--black);
+      color: var(--yellow);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .admin-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .admin-item img {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .btn-danger {
+      padding: 5px 10px;
+      background: #ffebee;
+      color: var(--danger);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .btn-dark {
+      width: 100%;
+      height: 38px;
+      background: var(--black);
+      color: var(--yellow);
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-msg {
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .status-msg.ok {
+      display: block;
+      background: #e8f5e9;
+      color: var(--success);
+    }
+
+    .status-msg.err {
+      display: block;
+      background: #ffebee;
+      color: var(--danger);
     }
 
     .footer {
@@ -532,7 +647,20 @@
       color: #bdbdbd;
       padding: 16px 0;
       font-size: 12px;
-      text-align: center;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .admin-link {
+      color: #9e9e9e;
+      text-decoration: underline;
+      font-size: 12px;
     }
   </style>
 </head>
@@ -563,6 +691,9 @@
         <input type="number" id="priceMin" class="price-input" placeholder="От, BYN" min="0" step="0.01">
         <span>—</span>
         <input type="number" id="priceMax" class="price-input" placeholder="До, BYN" min="0" step="0.01">
+        <label class="checkbox-label">
+          <input type="checkbox" id="discountOnly"> Только со скидкой
+        </label>
         <button type="button" id="resetBtn" class="reset-btn">Сбросить</button>
 
         <select id="sortSelect" class="sort-select" aria-label="Сортировка">
@@ -584,7 +715,10 @@
   </main>
 
   <footer class="footer">
-    <div class="container">© 2026 YellowBerry — Простой маркетплейс (BYN)</div>
+    <div class="container footer-inner">
+      <span>© 2026 YellowBerry — Простой маркетплейс (BYN)</span>
+      <button type="button" id="openAdminBtn" class="admin-link">Админ-панель</button>
+    </div>
   </footer>
 
   <!-- Модальное окно товара -->
@@ -609,34 +743,78 @@
     </div>
   </div>
 
+  <!-- Модальное окно входа в админку -->
+  <div class="backdrop modal-center" id="adminLoginModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 360px;">
+      <div class="panel-head">
+        <span>Вход в админ-панель</span>
+        <button type="button" class="close-btn" id="closeLoginBtn" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="panel-body">
+        <div id="loginError" class="status-msg err">Неверный пароль</div>
+        <form id="adminLoginForm" class="order-form">
+          <input type="password" id="adminPassInput" class="input-field" placeholder="Введите пароль" required>
+          <button type="submit" class="btn-yellow" style="height: 40px;">Войти</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно Админ-панели -->
+  <div class="backdrop modal-center" id="adminModal" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 640px;">
+      <div class="panel-head">
+        <span>Админ-панель YellowBerry</span>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <button type="button" id="adminLogoutBtn" style="font-size: 12px; color: var(--gray); text-decoration: underline;">Выйти</button>
+          <button type="button" class="close-btn" id="closeAdminBtn" aria-label="Закрыть">✕</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="admin-tabs">
+          <button type="button" class="admin-tab active" data-tab="add">Добавить товар</button>
+          <button type="button" class="admin-tab" data-tab="manage">Управление товарами</button>
+          <button type="button" class="admin-tab" data-tab="export">Сохранить для GitHub</button>
+        </div>
+        <div id="adminStatus" class="status-msg"></div>
+        <div id="adminContent"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function () {
       'use strict';
 
+      const ADMIN_PASS = '1029384756';
+      const AUTH_KEY = 'yb_admin_auth';
+      const PRODUCTS_KEY = 'yb_products';
+      const CART_KEY = 'yb_simple_cart_byn';
+
       // Генерация легкого встроенного SVG-изображения
       function makeSVG(bg, icon, tag) {
         const shapes = {
-          headphones: '<path d="M55 110v-18a45 45 0 0 1 90 0v18" fill="none" stroke="#141414" stroke-width="10" stroke-linecap="round"/><rect x="42" y="102" width="22" height="40" rx="8" fill="#141414"/><rect x="136" y="102" width="22" height="40" rx="8" fill="#141414"/>',
-          watch: '<rect x="84" y="28" width="32" height="144" rx="6" fill="#444"/><rect x="66" y="60" width="68" height="80" rx="16" fill="#141414" stroke="#ffdd00" stroke-width="4"/>',
-          hoodie: '<path d="M65 55 L100 42 L135 55 L160 85 L144 100 L132 88 L132 152 L68 152 L68 88 L56 100 L40 85 Z" fill="#141414"/><circle cx="100" cy="56" r="12" fill="#ffdd00"/>',
-          sneakers: '<path d="M35 128 Q42 95 75 95 L105 78 L125 98 Q162 102 168 128 Z" fill="#141414"/><rect x="32" y="126" width="138" height="14" rx="6" fill="#ffdd00"/>',
-          kettle: '<path d="M66 65 L134 65 L144 142 L56 142 Z" fill="#141414"/><path d="M134 80 Q158 80 158 108 Q158 132 138 132" fill="none" stroke="#141414" stroke-width="8"/><rect x="52" y="142" width="96" height="10" rx="4" fill="#ffdd00"/>',
-          serum: '<rect x="78" y="72" width="44" height="80" rx="8" fill="#141414"/><rect x="88" y="54" width="24" height="18" fill="#ffdd00"/><rect x="95" y="38" width="10" height="16" rx="4" fill="#141414"/>',
-          dumbbell: '<rect x="55" y="94" width="90" height="12" rx="4" fill="#444"/><rect x="38" y="72" width="18" height="56" rx="5" fill="#141414"/><rect x="144" y="72" width="18" height="56" rx="5" fill="#141414"/>',
-          powerbank: '<rect x="66" y="44" width="68" height="112" rx="12" fill="#141414"/><rect x="78" y="58" width="44" height="10" rx="3" fill="#ffdd00"/>',
-          tshirt: '<path d="M62 54 L138 54 L164 80 L146 96 L134 84 L134 150 L66 150 L66 84 L54 96 L36 80 Z" fill="#141414"/>',
-          boots: '<path d="M62 54 L104 54 L104 105 Q152 108 158 134 L58 134 Z" fill="#141414"/><rect x="56" y="134" width="104" height="12" rx="4" fill="#ffdd00"/>',
-          pan: '<circle cx="92" cy="100" r="44" fill="#141414"/><rect x="132" y="94" width="46" height="12" rx="6" fill="#ffdd00"/>',
-          cream: '<rect x="58" y="86" width="84" height="56" rx="10" fill="#141414"/><rect x="54" y="70" width="92" height="16" rx="5" fill="#ffdd00"/>',
-          mat: '<rect x="46" y="78" width="108" height="44" rx="22" fill="#141414"/><circle cx="132" cy="100" r="15" fill="#ffdd00"/>',
-          jeans: '<path d="M66 46 L134 46 L142 154 L108 154 L100 96 L92 154 L58 154 Z" fill="#141414"/>'
+          headphones: '<path d="M55 110v-18a45 45 0 0 1 90 0v18" fill="none" stroke="#1A1A1A" stroke-width="10" stroke-linecap="round"/><rect x="42" y="102" width="22" height="40" rx="8" fill="#1A1A1A"/><rect x="136" y="102" width="22" height="40" rx="8" fill="#1A1A1A"/>',
+          watch: '<rect x="84" y="28" width="32" height="144" rx="6" fill="#444"/><rect x="66" y="60" width="68" height="80" rx="16" fill="#1A1A1A" stroke="#FFCC00" stroke-width="4"/>',
+          hoodie: '<path d="M65 55 L100 42 L135 55 L160 85 L144 100 L132 88 L132 152 L68 152 L68 88 L56 100 L40 85 Z" fill="#1A1A1A"/><circle cx="100" cy="56" r="12" fill="#FFCC00"/>',
+          sneakers: '<path d="M35 128 Q42 95 75 95 L105 78 L125 98 Q162 102 168 128 Z" fill="#1A1A1A"/><rect x="32" y="126" width="138" height="14" rx="6" fill="#FFCC00"/>',
+          kettle: '<path d="M66 65 L134 65 L144 142 L56 142 Z" fill="#1A1A1A"/><path d="M134 80 Q158 80 158 108 Q158 132 138 132" fill="none" stroke="#1A1A1A" stroke-width="8"/><rect x="52" y="142" width="96" height="10" rx="4" fill="#FFCC00"/>',
+          serum: '<rect x="78" y="72" width="44" height="80" rx="8" fill="#1A1A1A"/><rect x="88" y="54" width="24" height="18" fill="#FFCC00"/><rect x="95" y="38" width="10" height="16" rx="4" fill="#1A1A1A"/>',
+          dumbbell: '<rect x="55" y="94" width="90" height="12" rx="4" fill="#444"/><rect x="38" y="72" width="18" height="56" rx="5" fill="#1A1A1A"/><rect x="144" y="72" width="18" height="56" rx="5" fill="#1A1A1A"/>',
+          powerbank: '<rect x="66" y="44" width="68" height="112" rx="12" fill="#1A1A1A"/><rect x="78" y="58" width="44" height="10" rx="3" fill="#FFCC00"/>',
+          tshirt: '<path d="M62 54 L138 54 L164 80 L146 96 L134 84 L134 150 L66 150 L66 84 L54 96 L36 80 Z" fill="#1A1A1A"/>',
+          boots: '<path d="M62 54 L104 54 L104 105 Q152 108 158 134 L58 134 Z" fill="#1A1A1A"/><rect x="56" y="134" width="104" height="12" rx="4" fill="#FFCC00"/>',
+          pan: '<circle cx="92" cy="100" r="44" fill="#1A1A1A"/><rect x="132" y="94" width="46" height="12" rx="6" fill="#FFCC00"/>',
+          cream: '<rect x="58" y="86" width="84" height="56" rx="10" fill="#1A1A1A"/><rect x="54" y="70" width="92" height="16" rx="5" fill="#FFCC00"/>',
+          mat: '<rect x="46" y="78" width="108" height="44" rx="22" fill="#1A1A1A"/><circle cx="132" cy="100" r="15" fill="#FFCC00"/>',
+          jeans: '<path d="M66 46 L134 46 L142 154 L108 154 L100 96 L92 154 L58 154 Z" fill="#1A1A1A"/>'
         };
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="${bg}"/>${shapes[icon] || ''}<text x="100" y="184" text-anchor="middle" fill="#141414" opacity="0.5" font-family="sans-serif" font-weight="700" font-size="11">${tag}</text></svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="${bg}"/>${shapes[icon] || ''}<text x="100" y="184" text-anchor="middle" fill="#1A1A1A" opacity="0.5" font-family="sans-serif" font-weight="700" font-size="11">${tag}</text></svg>`;
         return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
       }
 
-      // Каталог товаров (без рейтингов и отзывов)
-      const PRODUCTS = [
+      // Базовый массив товаров
+      const DEFAULT_PRODUCTS = [
         {
           id: 1,
           brand: 'SoundCore',
@@ -793,21 +971,47 @@
         }
       ];
 
+      /* YB_PRODUCTS_START */
+      const EMBEDDED_PRODUCTS = null;
+      /* YB_PRODUCTS_END */
+
       const CATEGORIES = ['Все', 'Электроника', 'Одежда', 'Обувь', 'Дом и кухня', 'Красота', 'Спорт'];
-      const STORAGE_KEY = 'yb_simple_cart_byn';
+
+      function loadProducts() {
+        try {
+          const saved = localStorage.getItem(PRODUCTS_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) return parsed;
+          }
+        } catch (e) {}
+        return Array.isArray(EMBEDDED_PRODUCTS) ? EMBEDDED_PRODUCTS : [...DEFAULT_PRODUCTS];
+      }
+
+      let products = loadProducts();
 
       let state = {
         category: 'Все',
         search: '',
         priceMin: '',
         priceMax: '',
+        discountOnly: false,
         sort: 'default',
+        adminTab: 'add',
         cart: loadCart()
       };
 
+      function saveProducts() {
+        try {
+          localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+        } catch (e) {
+          showAdminStatus('Память браузера переполнена. Используйте меньшие фото или скачайте index.html.', 'err');
+        }
+      }
+
       function loadCart() {
         try {
-          const data = localStorage.getItem(STORAGE_KEY);
+          const data = localStorage.getItem(CART_KEY);
           return data ? JSON.parse(data) : {};
         } catch (e) {
           return {};
@@ -816,7 +1020,7 @@
 
       function saveCart() {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state.cart));
+          localStorage.setItem(CART_KEY, JSON.stringify(state.cart));
         } catch (e) {}
       }
 
@@ -859,8 +1063,9 @@
         const min = state.priceMin !== '' ? Number(state.priceMin) : null;
         const max = state.priceMax !== '' ? Number(state.priceMax) : null;
 
-        let items = PRODUCTS.filter(p => {
+        let items = products.filter(p => {
           if (state.category !== 'Все' && p.category !== state.category) return false;
+          if (state.discountOnly && (!p.oldPrice || p.oldPrice <= p.price)) return false;
           if (min !== null && !isNaN(min) && p.price < min) return false;
           if (max !== null && !isNaN(max) && p.price > max) return false;
           if (q && !`${p.brand} ${p.title} ${p.category}`.toLowerCase().includes(q)) return false;
@@ -916,16 +1121,19 @@
 
       // Карточка товара (модальное окно)
       function openProduct(id) {
-        const p = PRODUCTS.find(x => x.id === id);
+        const p = products.find(x => x.id === id);
         if (!p) return;
 
         document.getElementById('modalBrand').textContent = p.brand;
-        const specsHtml = Object.entries(p.specs).map(([k, v]) => `
-          <div class="spec-line">
-            <span style="color: var(--gray);">${k}</span>
-            <strong>${v}</strong>
-          </div>
-        `).join('');
+        const specsEntries = p.specs ? Object.entries(p.specs) : [];
+        const specsHtml = specsEntries.length
+          ? `<div class="specs">${specsEntries.map(([k, v]) => `
+              <div class="spec-line">
+                <span style="color: var(--gray);">${k}</span>
+                <strong>${v}</strong>
+              </div>
+            `).join('')}</div>`
+          : '';
 
         document.getElementById('productModalBody').innerHTML = `
           <div class="detail-layout">
@@ -937,8 +1145,8 @@
                 <span class="price-now" style="font-size: 20px;">${formatBYN(p.price)}</span>
                 ${p.oldPrice ? `<span class="price-old">${formatBYN(p.oldPrice)}</span>` : ''}
               </div>
-              <p style="font-size: 13px; margin-bottom: 10px;">${p.description}</p>
-              <div class="specs">${specsHtml}</div>
+              <p style="font-size: 13px; margin-bottom: 10px; white-space: pre-line;">${p.description || ''}</p>
+              ${specsHtml}
               <button type="button" class="btn-yellow js-modal-add" data-id="${p.id}" style="height: 40px; font-size: 14px;">
                 Добавить в корзину
               </button>
@@ -965,7 +1173,7 @@
 
         let total = 0;
         const listHtml = entries.map(([idStr, qty]) => {
-          const p = PRODUCTS.find(x => x.id === Number(idStr));
+          const p = products.find(x => x.id === Number(idStr));
           if (!p) return '';
           total += p.price * qty;
 
@@ -1008,16 +1216,186 @@
         state.search = '';
         state.priceMin = '';
         state.priceMax = '';
+        state.discountOnly = false;
         state.sort = 'default';
 
         document.getElementById('searchInput').value = '';
         document.getElementById('searchClear').classList.remove('visible');
         document.getElementById('priceMin').value = '';
         document.getElementById('priceMax').value = '';
+        document.getElementById('discountOnly').checked = false;
         document.getElementById('sortSelect').value = 'default';
 
         renderCategories();
         renderProducts();
+      }
+
+      // Сжатие фото через canvas до 400x400px JPEG (качество 0.75)
+      function compressImageFile(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('Ошибка чтения файла'));
+          reader.onload = ev => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Некорректное изображение'));
+            img.onload = () => {
+              const maxSize = 400;
+              let w = img.width;
+              let h = img.height;
+              if (w > maxSize || h > maxSize) {
+                if (w > h) {
+                  h = Math.round((h * maxSize) / w);
+                  w = maxSize;
+                } else {
+                  w = Math.round((w * maxSize) / h);
+                  h = maxSize;
+                }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, w, h);
+              ctx.drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL('image/jpeg', 0.75));
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Админ-панель: логика и рендер
+      function showAdminStatus(text, type) {
+        const el = document.getElementById('adminStatus');
+        if (!text) {
+          el.className = 'status-msg';
+          el.textContent = '';
+          return;
+        }
+        el.textContent = text;
+        el.className = 'status-msg ' + (type || 'ok');
+      }
+
+      function openAdminEntry() {
+        if (sessionStorage.getItem(AUTH_KEY) === '1') {
+          showAdminStatus('');
+          renderAdminPanel();
+          document.getElementById('adminModal').classList.add('open');
+        } else {
+          document.getElementById('loginError').classList.remove('err');
+          document.getElementById('adminPassInput').value = '';
+          document.getElementById('adminLoginModal').classList.add('open');
+          setTimeout(() => document.getElementById('adminPassInput').focus(), 50);
+        }
+      }
+
+      function buildUpdatedHTML() {
+        const docHtml = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+        const markerRegex = /\/\* YB_PRODUCTS_START \*\/[\s\S]*?\/\* YB_PRODUCTS_END \*\//;
+        const replacement = `/* YB_PRODUCTS_START */\n      const EMBEDDED_PRODUCTS = ${JSON.stringify(products)};\n      /* YB_PRODUCTS_END */`;
+        return docHtml.replace(markerRegex, replacement);
+      }
+
+      function renderAdminPanel() {
+        document.querySelectorAll('.admin-tab').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.tab === state.adminTab);
+        });
+
+        const container = document.getElementById('adminContent');
+        const catOptions = CATEGORIES.filter(c => c !== 'Все')
+          .map(c => `<option value="${c}">${c}</option>`)
+          .join('');
+
+        if (state.adminTab === 'add') {
+          container.innerHTML = `
+            <form id="addProductForm">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Название товара *</label>
+                  <input type="text" id="admTitle" class="input-field" placeholder="Например: Рюкзак городской" required>
+                </div>
+                <div class="form-group">
+                  <label>Бренд *</label>
+                  <input type="text" id="admBrand" class="input-field" placeholder="Например: UrbanWear" required>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Категория *</label>
+                  <select id="admCat" class="select-field">${catOptions}</select>
+                </div>
+                <div class="form-group">
+                  <label>Цена, BYN *</label>
+                  <input type="number" id="admPrice" class="input-field" placeholder="45.50" min="0.01" step="0.01" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Старая цена, BYN (необязательно, для скидки)</label>
+                <input type="number" id="admOldPrice" class="input-field" placeholder="65.00" min="0.01" step="0.01">
+              </div>
+
+              <div class="form-group">
+                <label>Фотография: прямая ссылка (URL)</label>
+                <input type="url" id="admImgUrl" class="input-field" placeholder="https://...">
+              </div>
+
+              <div class="form-group">
+                <label>Или загрузить фото с телефона / ПК (автосжатие 400x400 JPEG)</label>
+                <input type="file" id="admImgFile" accept="image/*" style="font-size: 13px;">
+              </div>
+
+              <div class="form-group">
+                <label>Краткое описание и характеристики</label>
+                <textarea id="admDesc" class="textarea-field" placeholder="Материал: 100% хлопок. Цвет: черный..."></textarea>
+              </div>
+
+              <button type="submit" class="btn-yellow" style="height: 40px; font-size: 14px;">Добавить товар в каталог</button>
+            </form>
+          `;
+        } else if (state.adminTab === 'manage') {
+          const listHtml = products.map(p => `
+            <div class="admin-item">
+              <img src="${p.image}" alt="">
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  ${p.brand} — ${p.title}
+                </div>
+                <div style="color: var(--gray); font-size: 12px;">
+                  ${p.category} • <strong>${formatBYN(p.price)}</strong>
+                </div>
+              </div>
+              <button type="button" class="btn-danger js-adm-del" data-id="${p.id}">Удалить</button>
+            </div>
+          `).join('');
+
+          container.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <span style="font-size: 13px; color: var(--gray);">Всего товаров: <strong>${products.length}</strong></span>
+              <button type="button" id="admResetDefaults" class="btn-danger">Сбросить к стандартным</button>
+            </div>
+            <div style="max-height: 360px; overflow-y: auto; border-top: 1px solid var(--border);">
+              ${listHtml || '<p style="padding: 20px 0; text-align: center; color: var(--gray);">Список пуст</p>'}
+            </div>
+          `;
+        } else if (state.adminTab === 'export') {
+          const jsCode = `const PRODUCTS = ${JSON.stringify(products, null, 2)};`;
+          container.innerHTML = `
+            <p style="font-size: 13px; color: var(--gray); margin-bottom: 12px;">
+              На GitHub Pages изменения сохраняются в вашем браузере. Чтобы новые товары увидели все покупатели, скачайте обновленный файл <strong>index.html</strong> и замените его в репозитории GitHub:
+            </p>
+            <button type="button" id="admDownloadHtml" class="btn-yellow" style="height: 42px; font-size: 14px; margin-bottom: 10px;">
+              ⬇ Скачать готовый index.html
+            </button>
+            <button type="button" id="admCopyJs" class="btn-dark" style="margin-bottom: 12px;">
+              Скопировать массив товаров (JS)
+            </button>
+            <textarea id="admExportBox" class="textarea-field" readonly style="height: 140px; font-family: monospace; font-size: 11px;">${jsCode}</textarea>
+          `;
+        }
       }
 
       // События
@@ -1057,6 +1435,11 @@
 
       document.getElementById('priceMax').addEventListener('input', e => {
         state.priceMax = e.target.value;
+        renderProducts();
+      });
+
+      document.getElementById('discountOnly').addEventListener('change', e => {
+        state.discountOnly = e.target.checked;
         renderProducts();
       });
 
@@ -1134,6 +1517,146 @@
             </div>
           `;
         }
+      });
+
+      // События Админ-панели
+      const adminLoginModal = document.getElementById('adminLoginModal');
+      const adminModal = document.getElementById('adminModal');
+
+      document.getElementById('openAdminBtn').addEventListener('click', openAdminEntry);
+      document.getElementById('closeLoginBtn').addEventListener('click', () => adminLoginModal.classList.remove('open'));
+      adminLoginModal.addEventListener('click', e => {
+        if (e.target === adminLoginModal) adminLoginModal.classList.remove('open');
+      });
+
+      document.getElementById('adminLoginForm').addEventListener('submit', e => {
+        e.preventDefault();
+        const pass = document.getElementById('adminPassInput').value;
+        if (pass === ADMIN_PASS) {
+          sessionStorage.setItem(AUTH_KEY, '1');
+          adminLoginModal.classList.remove('open');
+          showAdminStatus('');
+          renderAdminPanel();
+          adminModal.classList.add('open');
+        } else {
+          document.getElementById('loginError').classList.add('err');
+        }
+      });
+
+      document.getElementById('closeAdminBtn').addEventListener('click', () => adminModal.classList.remove('open'));
+      adminModal.addEventListener('click', e => {
+        if (e.target === adminModal) adminModal.classList.remove('open');
+
+        const tabBtn = e.target.closest('.admin-tab');
+        if (tabBtn) {
+          state.adminTab = tabBtn.dataset.tab;
+          showAdminStatus('');
+          renderAdminPanel();
+          return;
+        }
+
+        const delBtn = e.target.closest('.js-adm-del');
+        if (delBtn) {
+          const id = Number(delBtn.dataset.id);
+          products = products.filter(p => p.id !== id);
+          delete state.cart[id];
+          saveProducts();
+          saveCart();
+          updateBadge();
+          renderProducts();
+          renderAdminPanel();
+          showAdminStatus('Товар удален', 'ok');
+          return;
+        }
+
+        if (e.target.id === 'admResetDefaults') {
+          localStorage.removeItem(PRODUCTS_KEY);
+          products = [...DEFAULT_PRODUCTS];
+          renderProducts();
+          renderAdminPanel();
+          showAdminStatus('Восстановлены стандартные товары', 'ok');
+          return;
+        }
+
+        if (e.target.id === 'admDownloadHtml') {
+          const html = buildUpdatedHTML();
+          const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'index.html';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showAdminStatus('Файл index.html скачан! Загрузите его в репозиторий GitHub.', 'ok');
+          return;
+        }
+
+        if (e.target.id === 'admCopyJs') {
+          const box = document.getElementById('admExportBox');
+          box.select();
+          document.execCommand('copy');
+          showAdminStatus('Код массива товаров скопирован в буфер обмена', 'ok');
+        }
+      });
+
+      document.getElementById('adminLogoutBtn').addEventListener('click', () => {
+        sessionStorage.removeItem(AUTH_KEY);
+        adminModal.classList.remove('open');
+      });
+
+      document.getElementById('adminContent').addEventListener('submit', async e => {
+        if (e.target.id !== 'addProductForm') return;
+        e.preventDefault();
+
+        const title = document.getElementById('admTitle').value.trim();
+        const brand = document.getElementById('admBrand').value.trim();
+        const category = document.getElementById('admCat').value;
+        const price = parseFloat(document.getElementById('admPrice').value);
+        const oldPriceRaw = document.getElementById('admOldPrice').value;
+        const oldPrice = oldPriceRaw ? parseFloat(oldPriceRaw) : null;
+        const imgUrl = document.getElementById('admImgUrl').value.trim();
+        const imgFile = document.getElementById('admImgFile').files[0];
+        const description = document.getElementById('admDesc').value.trim();
+
+        let image = makeSVG('#fff8cc', 'tshirt', brand.toUpperCase().slice(0, 10));
+        if (imgFile) {
+          try {
+            image = await compressImageFile(imgFile);
+          } catch (err) {
+            showAdminStatus('Не удалось обработать фото. Попробуйте другой файл.', 'err');
+            return;
+          }
+        } else if (imgUrl) {
+          image = imgUrl;
+        }
+
+        const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
+        products.unshift({
+          id: newId,
+          brand,
+          title,
+          category,
+          price: Number(price.toFixed(2)),
+          oldPrice: oldPrice && oldPrice > price ? Number(oldPrice.toFixed(2)) : null,
+          image,
+          description: description || 'Новый товар маркетплейса YellowBerry.',
+          specs: { 'Категория': category, 'Бренд': brand }
+        });
+
+        saveProducts();
+        renderProducts();
+        e.target.reset();
+        showAdminStatus(`Товар «${brand} — ${title}» добавлен в каталог!`, 'ok');
+      });
+
+      // Поддержка открытия по хешу #admin
+      if (window.location.hash === '#admin') {
+        openAdminEntry();
+      }
+      window.addEventListener('hashchange', () => {
+        if (window.location.hash === '#admin') openAdminEntry();
       });
 
       // Инициализация
